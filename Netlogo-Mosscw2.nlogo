@@ -441,7 +441,7 @@ to go
   vary-info
   memory-fill
   memory-delete
-  disposition-function
+  disposition-function-probability
   cognitive-function
   social-influence
   habit-activation
@@ -523,7 +523,7 @@ to vary-info
           [set oat-env-mean (oat-env-mean + (oat-env-mean * 0.05))] ; increases oat-env-mean by 5%
           [set oat-env-mean (oat-env-mean - (oat-env-mean * 0.05))] ; decreases oat-env-mean by 5%
       ]
-      
+
       ;soy varied quantities
       if soy-quantity = 0 [
         ifelse (incum-health-mean / soy-health-mean) > 1000000
@@ -601,13 +601,13 @@ to vary-info
       set pin_oat random-normal oat-health-mean 0.1
       set pex_oat random-normal oat-env-mean 0.1
 
-      set pph_soy random-normal oat-physical-mean 0.1
-      set pin_soy random-normal oat-health-mean 0.1
-      set pex_soy random-normal oat-env-mean 0.1
+      set pph_soy random-normal soy-physical-mean 0.1
+      set pin_soy random-normal soy-health-mean 0.1
+      set pex_soy random-normal soy-env-mean 0.1
 
-      set pph_almond random-normal oat-physical-mean 0.1
-      set pin_almond random-normal oat-health-mean 0.1
-      set pex_almond random-normal oat-env-mean 0.1
+      set pph_almond random-normal almond-physical-mean 0.1
+      set pin_almond random-normal almond-health-mean 0.1
+      set pex_almond random-normal almond-env-mean 0.1
 
       while [pphincum <= mmin] [set pphincum random-normal incum-physical-mean 0.1]
       while [pinincum <= mmin] [set pinincum random-normal incum-health-mean 0.1]
@@ -714,30 +714,116 @@ to disposition-function
   ]
 end
 
+;to disposition-function-probability
+;  ;this function calculates and manages the process of agent disposition in the probability-based model variant
+;  ask turtles [
+;    set f-red count link-neighbors with [color = red]
+;    set f-green count link-neighbors with [color = green]
+;    set f-all count link-neighbors
+;    set h-max (2 * (-(1 / 2) * log (1 / 2) 2))
+;
+;    ifelse ((count link-neighbors with [color != red]) = 0) or ((count link-neighbors with [color != green]) = 0)
+;      [set h-entropy 0]
+;      [set h-entropy ((-(f-red / f-all) * log (f-red / f-all) 2) + (-(f-green / f-all) * log (f-green / f-all) 2))]
+;
+;    set prob-disposition (1 / (1 + exp(- (disposition-probability-gradient) * ((h-entropy / h-max) - 0.5))))
+;
+;    ifelse random-float 1 <= prob-disposition
+;      [set disposition-piqued? TRUE]
+;      [set disposition-piqued? FALSE]
+;
+;    ;agents can also become disposed to consider alternatives given a state of cognitive dissonance
+;    if cognitive-dissonance? = TRUE [
+;    if choice-function-deviation = min(list choice-function-deviation value-health-deviation value-env-deviation)
+;      [set disposition-piqued? TRUE]]
+;  ]
+;end
+
+;to disposition-function-probability
+;  ; This function calculates and manages the process of agent disposition in the probability-based model variant
+;  ask turtles [
+;    ; Count neighbors of each type
+;    set f-red count link-neighbors with [color = red]         ; dairy
+;    set f-green count link-neighbors with [color = green]     ; oat
+;    set f-yellow count link-neighbors with [color = yellow]   ; soy
+;    set f-white count link-neighbors with [color = white]     ; almond
+;    set f-all count link-neighbors                            ; total number of neighbors
+;
+;    ; Maximum entropy for four options
+;    set h-max 2
+;
+;    ; Check if any of the choices has zero neighbors, if so, set entropy to 0
+;    ifelse ((count link-neighbors with [color != red]) = 0) or
+;            ((count link-neighbors with [color != green]) = 0) or
+;            ((count link-neighbors with [color != yellow]) = 0) or
+;            ((count link-neighbors with [color != white]) = 0)
+;      [set h-entropy 0]
+;      [
+;        ; Calculate entropy with four categories
+;        set h-entropy (-(f-red / f-all) * log (f-red / f-all) 2
+;                      - (f-green / f-all) * log (f-green / f-all) 2
+;                      - (f-yellow / f-all) * log (f-yellow / f-all) 2
+;                      - (f-white / f-all) * log (f-white / f-all) 2)
+;      ]
+;
+;    ; Calculate probability of disposition using logistic function with normalized entropy
+;    set prob-disposition (1 / (1 + exp(- (disposition-probability-gradient) * ((h-entropy / h-max) - 0.5))))
+;
+;    ; Set disposition status based on probability
+;    ifelse random-float 1 <= prob-disposition
+;      [set disposition-piqued? TRUE]
+;      [set disposition-piqued? FALSE]
+;
+;    ; Additional disposition consideration for cognitive dissonance
+;    if cognitive-dissonance? = TRUE [
+;      if choice-function-deviation = min(list choice-function-deviation value-health-deviation value-env-deviation)
+;        [set disposition-piqued? TRUE]
+;    ]
+;  ]
+;end
+
 to disposition-function-probability
-  ;this function calculates and manages the process of agent disposition in the probability-based model variant
+  ; This function calculates and manages the process of agent disposition in the probability-based model variant
   ask turtles [
-    set f-red count link-neighbors with [color = red]
-    set f-green count link-neighbors with [color = green]
-    set f-all count link-neighbors
-    set h-max (2 * (-(1 / 2) * log (1 / 2) 2))
-
-    ifelse ((count link-neighbors with [color != red]) = 0) or ((count link-neighbors with [color != green]) = 0)
+    ; Count neighbors of each type
+    set f-red count link-neighbors with [color = red]         ; dairy
+    set f-green count link-neighbors with [color = green]     ; oat
+    set f-yellow count link-neighbors with [color = yellow]   ; soy
+    set f-white count link-neighbors with [color = white]     ; almond
+    set f-all count link-neighbors                            ; total number of neighbors
+    ; Maximum entropy for four options
+    set h-max 2
+    ; Check if any of the choices has zero neighbors, if so, set entropy to 0
+    ifelse ((count link-neighbors with [color != red]) = 0) or
+            ((count link-neighbors with [color != green]) = 0) or
+            ((count link-neighbors with [color != yellow]) = 0) or
+            ((count link-neighbors with [color != white]) = 0)
       [set h-entropy 0]
-      [set h-entropy ((-(f-red / f-all) * log (f-red / f-all) 2) + (-(f-green / f-all) * log (f-green / f-all) 2))]
-
+      [
+        ; Calculate entropy with four categories
+        let p-red (f-red / f-all)
+        let p-green (f-green / f-all)
+        let p-yellow (f-yellow / f-all)
+        let p-white (f-white / f-all)
+        set h-entropy (-(ifelse-value (p-red = 0) [0] [p-red * log (p-red) 2])
+                      -(ifelse-value (p-green = 0) [0] [p-green * log (p-green) 2])
+                      -(ifelse-value (p-yellow = 0) [0] [p-yellow * log (p-yellow) 2])
+                      -(ifelse-value (p-white = 0) [0] [p-white * log (p-white) 2]))
+      ]
+    ; Calculate probability of disposition using logistic function with normalized entropy
     set prob-disposition (1 / (1 + exp(- (disposition-probability-gradient) * ((h-entropy / h-max) - 0.5))))
-
+    ; Set disposition status based on probability
     ifelse random-float 1 <= prob-disposition
       [set disposition-piqued? TRUE]
       [set disposition-piqued? FALSE]
-
-    ;agents can also become disposed to consider alternatives given a state of cognitive dissonance
+    ; Additional disposition consideration for cognitive dissonance
     if cognitive-dissonance? = TRUE [
-    if choice-function-deviation = min(list choice-function-deviation value-health-deviation value-env-deviation)
-      [set disposition-piqued? TRUE]]
+      if choice-function-deviation = min(list choice-function-deviation value-health-deviation value-env-deviation)
+        [set disposition-piqued? TRUE]
+    ]
   ]
 end
+
 
 ;to cognitive-function ;Probably change this
 ;  ;this function generates an agent's base score of the cognitive perception of the milk characterisitcs based on information
@@ -749,14 +835,14 @@ end
 ;    set mem-in-alt-avg mean mem-alt-in
 ;    set mem-ex-incum-avg mean mem-incum-ex ;environment
 ;    set mem-ex-alt-avg mean mem-alt-ex
-;    
-;    
+;
+;
 ;    set weights-raw (list ph-weight-raw in-weight-raw ex-weight-raw)
 ;    set ph-weight ph-weight-raw / sum weights-raw
 ;    set in-weight in-weight-raw / sum weights-raw
 ;    set ex-weight ex-weight-raw / sum weights-raw
-;    
-;    
+;
+;
 ;    set uf-incum (ph-weight * mem-ph-incum-avg + in-weight * mem-in-incum-avg + ex-weight * mem-ex-incum-avg)
 ;    set uf-alt (ph-weight * mem-ph-alt-avg + in-weight * mem-in-alt-avg + ex-weight * mem-ex-alt-avg)
 ;  ]
@@ -772,23 +858,23 @@ to cognitive-function
     set mem-ph-oat-avg mean mem-oat-ph
     set mem-ph-soy-avg mean mem-soy-ph
     set mem-ph-almond-avg mean mem-almond-ph
-    
+
     set mem-in-incum-avg mean mem-incum-in
     set mem-in-oat-avg mean mem-oat-in
     set mem-in-soy-avg mean mem-soy-in
     set mem-in-almond-avg mean mem-almond-in
-    
+
     set mem-ex-incum-avg mean mem-incum-ex
     set mem-ex-oat-avg mean mem-oat-ex
     set mem-ex-soy-avg mean mem-soy-ex
     set mem-ex-almond-avg mean mem-almond-ex
-    
+
     ; Normalise weights
     set weights-raw (list ph-weight-raw in-weight-raw ex-weight-raw)
     set ph-weight ph-weight-raw / sum weights-raw
     set in-weight in-weight-raw / sum weights-raw
     set ex-weight ex-weight-raw / sum weights-raw
-    
+
     ; Calculate utility functions for each milk option
     set uf-incum (ph-weight * mem-ph-incum-avg + in-weight * mem-in-incum-avg + ex-weight * mem-ex-incum-avg)
     set uf-oat (ph-weight * mem-ph-oat-avg + in-weight * mem-in-oat-avg + ex-weight * mem-ex-oat-avg)
@@ -823,13 +909,13 @@ to social-influence
       if random-float 1 <= p-interact [
         ifelse count my-links >= 1 [
           let ME self
-          
+
           ; Calculate new utility functions for each milk type based on social influence
           set new-uf-incum (([uf-incum] of ME) * (1 - social-susceptibility)) + ((sum [uf-incum] of link-neighbors) / (count my-links)) * social-susceptibility
           set new-uf-oat (([uf-oat] of ME) * (1 - social-susceptibility)) + ((sum [uf-oat] of link-neighbors) / (count my-links)) * social-susceptibility
           set new-uf-soy (([uf-soy] of ME) * (1 - social-susceptibility)) + ((sum [uf-soy] of link-neighbors) / (count my-links)) * social-susceptibility
           set new-uf-almond (([uf-almond] of ME) * (1 - social-susceptibility)) + ((sum [uf-almond] of link-neighbors) / (count my-links)) * social-susceptibility
-          
+
         ] [
           ; If no neighbors, retain current utility functions
           set new-uf-incum uf-incum
@@ -837,7 +923,7 @@ to social-influence
           set new-uf-soy uf-soy
           set new-uf-almond uf-almond
         ]
-        
+
         ; Update the utility functions to the new socially influenced values
         set uf-incum new-uf-incum
         set uf-oat new-uf-oat
@@ -900,7 +986,7 @@ to habit-activation
     let peak-habit 2
     if num-conseq-same-choice >= habit-threshold [set habit? TRUE]
     if habit-on? and habit? [set habit-function TRUE]
-    
+
     ; Adjust habit factor based on the chosen milk type
     if (habit-function = TRUE) [
       if food-choice = red [
@@ -928,7 +1014,7 @@ to habit-activation
         set habit-factor-soy 1
       ]
     ]
-    
+
     ; Reset habit factors if the habit function is inactive
     if habit-function = FALSE [
       set habit-factor-incum 1
@@ -983,16 +1069,16 @@ end
 ;      ; Compare utilities modified by habit factors for each milk type
 ;      ; maybe a probelm in the way how max list is used in netlogo
 ;      ;let max-uf max list (uf-incum * habit-factor-incum uf-oat * habit-factor-oat) ; (uf-soy * habit-factor-soy) (uf-almond * habit-factor-almond))
-;      let max-uf max list (list (uf-incum * habit-factor-incum) 
-;                                 (uf-oat * habit-factor-oat) 
-;                                 (uf-soy * habit-factor-soy) 
+;      let max-uf max list (list (uf-incum * habit-factor-incum)
+;                                 (uf-oat * habit-factor-oat)
+;                                 (uf-soy * habit-factor-soy)
 ;                                 (uf-almond * habit-factor-almond))
-;      
+;
 ;      if max-uf = (uf-incum * habit-factor-incum) [set color red set food-choice red]
 ;      if max-uf = (uf-oat * habit-factor-oat) [set color green set food-choice green]
 ;      if max-uf = (uf-soy * habit-factor-soy) [set color yellow set food-choice yellow]
 ;      if max-uf = (uf-almond * habit-factor-almond) [set color white set food-choice white]
-;      
+;
 ;      set choice-history choice-history + 1
 ;      if food-choice = red [set incum-history incum-history + 1]
 ;      if food-choice = green [set oat-history oat-history + 1]
@@ -1014,7 +1100,7 @@ end
 ;    ; Calculate quantities based on utility functions and habit factors for each type
 ;    if (disposition-piqued? = TRUE) and ((uf-incum * habit-factor-incum + uf-oat * habit-factor-oat + uf-soy * habit-factor-soy + uf-almond * habit-factor-almond) != 0) [
 ;      let total-uf (uf-incum * habit-factor-incum + uf-oat * habit-factor-oat + uf-soy * habit-factor-soy + uf-almond * habit-factor-almond)
-;      
+;
 ;      set incum-quantity ((uf-incum * habit-factor-incum) / total-uf) * total-average-milk
 ;      set oat-quantity ((uf-oat * habit-factor-oat) / total-uf) * total-average-milk
 ;      set soy-quantity ((uf-soy * habit-factor-soy) / total-uf) * total-average-milk
@@ -1071,13 +1157,13 @@ to make-choice
 
       ; Final comparison between the two maximums from the pairs
       let max-uf max (list max-incum-oat max-soy-almond)
-      
+
       ; Assign food choice and color based on the maximum utility found
       if max-uf = incum-utility [set color red set food-choice red]
       if max-uf = oat-utility [set color green set food-choice green]
       if max-uf = soy-utility [set color yellow set food-choice yellow]
       if max-uf = almond-utility [set color white set food-choice white]
-      
+
       set choice-history choice-history + 1
       if food-choice = red [set incum-history incum-history + 1]
       if food-choice = green [set oat-history oat-history + 1]
@@ -1099,7 +1185,7 @@ to make-choice
     ; Calculate quantities based on utility functions and habit factors for each type
     if (disposition-piqued? = TRUE) and ((uf-incum * habit-factor-incum + uf-oat * habit-factor-oat + uf-soy * habit-factor-soy + uf-almond * habit-factor-almond) != 0) [
       let total-uf (uf-incum * habit-factor-incum + uf-oat * habit-factor-oat + uf-soy * habit-factor-soy + uf-almond * habit-factor-almond)
-      
+
       set incum-quantity ((uf-incum * habit-factor-incum) / total-uf) * total-average-milk
       set oat-quantity ((uf-oat * habit-factor-oat) / total-uf) * total-average-milk
       set soy-quantity ((uf-soy * habit-factor-soy) / total-uf) * total-average-milk
@@ -1319,14 +1405,13 @@ end
 ;end
 
 to choice-evaluation
-  ;this function models the evaluation of an agent's choice against its human values, and determines if an agent will enter a state of cognitive dissonance.
+  ; This function models the evaluation of an agent's choice against its human values, and determines if an agent will enter a state of cognitive dissonance.
   ask turtles [
     if random-float 1 >= social-blindness [
       let incumbent-choice-function (uf-incum * habit-factor-incum)
       let oat-choice-function (uf-oat * habit-factor-oat)
       let soy-choice-function (uf-soy * habit-factor-soy)
       let almond-choice-function (uf-almond * habit-factor-almond)
-
       ; Calculate weighted average impacts across all milk types
       let weighted-average-health-impact (
         (incum-quantity * item 0 choice-health-sums) +
@@ -1334,39 +1419,40 @@ to choice-evaluation
         (soy-quantity * item 2 choice-health-sums) +
         (almond-quantity * item 3 choice-health-sums)
       ) / total-average-milk
-
       let weighted-average-env-impact (
         (incum-quantity * item 0 choice-env-sums) +
         (oat-quantity * item 1 choice-env-sums) +
         (soy-quantity * item 2 choice-env-sums) +
         (almond-quantity * item 3 choice-env-sums)
       ) / total-average-milk
-
+      ; Check to avoid division by zero
+      let max-choice-function max (list incumbent-choice-function oat-choice-function soy-choice-function almond-choice-function)
+      if max-choice-function != 0 [
+        set choice-function-deviation (
+          max-choice-function -
+          (sum (list incumbent-choice-function oat-choice-function soy-choice-function almond-choice-function) - max-choice-function) / 3
+        ) / max-choice-function
+      ] 
       set choice-value-health weighted-average-health-impact - min(choice-health-sums) * (1 / health-diff)
       set choice-value-env weighted-average-env-impact - min(choice-env-sums) * (1 / env-diff)
-
       set value-health-deviation abs (choice-value-health - security-value)
       set value-env-deviation abs (choice-value-env - universalism-value)
-
-      ; Calculate choice-function-deviation considering all milk types
-      set choice-function-deviation (
-        max (list incumbent-choice-function oat-choice-function soy-choice-function almond-choice-function) - 
-        (sum (list incumbent-choice-function oat-choice-function soy-choice-function almond-choice-function) - 
-          max (list incumbent-choice-function oat-choice-function soy-choice-function almond-choice-function)) / 3
-      ) / max (list incumbent-choice-function oat-choice-function soy-choice-function almond-choice-function)
-
-      ifelse ((value-health-deviation >= cognitive-dissonance-threshold) and (value-health-deviation <= justification)) or ((value-env-deviation >= cognitive-dissonance-threshold) and (value-env-deviation <= justification))
-        [set cognitive-dissonance? TRUE]
-        [set cognitive-dissonance? FALSE]
-
-      if cognitive-dissonance? = TRUE [
-        if (value-health-deviation = min (list choice-function-deviation value-health-deviation value-env-deviation)) and (count my-links >= 1)
-          [let ME self
-          set security-value (([security-value] of ME) * (1 - social-susceptibility)) + ((sum [security-value] of link-neighbors) / count my-links) * social-susceptibility]
-        if (value-env-deviation = min (list choice-function-deviation value-health-deviation value-env-deviation)) and (count my-links >= 1)
-          [let ME self
-          set universalism-value (([universalism-value] of ME) * (1 - social-susceptibility)) + ((sum [universalism-value] of link-neighbors) / count my-links) * social-susceptibility]
+      ifelse ((value-health-deviation >= cognitive-dissonance-threshold) and (value-health-deviation <= justification)) or ((value-env-deviation >= cognitive-dissonance-threshold) and (value-env-deviation <= justification)) [
+        set cognitive-dissonance? TRUE
+      ] [
+        set cognitive-dissonance? FALSE
+      ]
+      if cognitive-dissonance? [
+        if (value-health-deviation = min (list choice-function-deviation value-health-deviation value-env-deviation)) and (count my-links >= 1) [
+          let ME self
+          set security-value (([security-value] of ME) * (1 - social-susceptibility)) + ((sum [security-value] of link-neighbors) / count my-links) * social-susceptibility
+        ]
+        if (value-env-deviation = min (list choice-function-deviation value-health-deviation value-env-deviation)) and (count my-links >= 1) [
+          let ME self
+          set universalism-value (([universalism-value] of ME) * (1 - social-susceptibility)) + ((sum [universalism-value] of link-neighbors) / count my-links) * social-susceptibility
+        ]
       ]
     ]
   ]
 end
+
