@@ -1,0 +1,16 @@
+"BehaviorSpace results (NetLogo 6.3.0)"
+"C:\Users\zheng\Downloads\an-abm-of-historic-british-milk-consumption_v1.0.0\code\abm_milk_choice_upload.nlogo"
+"my_exp"
+"11/16/2024 19:22:40:636 +0000"
+"min-pxcor","max-pxcor","min-pycor","max-pycor"
+"-25","25","-25","25"
+"[run number]","1","1","1","1","2","2","2","2","3","3","3","3","4","4","4","4"
+"network-parameter","6",,,,"6",,,,"3",,,,"3",,,
+"social-conformity","-0.35",,,,"-0.35",,,,"-0.35",,,,"-0.35",,,
+"social-blindness","0.35",,,,"0.4",,,,"0.35",,,,"0.4",,,
+"habit-threshold","2",,,,"2",,,,"2",,,,"2",,,
+"cognitive-dissonance-threshold","0.43",,,,"0.43",,,,"0.43",,,,"0.43",,,
+"[steps]","32","32","32","32","32","32","32","32","32","32","32","32","32","32","32","32"
+
+"[initial & final values]","count turtles with [color = red]","count turtles with [color = green]","count turtles with [color = white]","count turtles with [color = yellow]","count turtles with [color = red]","count turtles with [color = green]","count turtles with [color = white]","count turtles with [color = yellow]","count turtles with [color = red]","count turtles with [color = green]","count turtles with [color = white]","count turtles with [color = yellow]","count turtles with [color = red]","count turtles with [color = green]","count turtles with [color = white]","count turtles with [color = yellow]"
+,"756","0","238","6","744","0","251","5","889","1","108","2","794","4","196","6"

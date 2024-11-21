@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE experiments SYSTEM "behaviorspace.dtd">
+<experiments>
+  <experiment name="my_exp" repetitions="1" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="32"/>
+    
+    <!-- Metrics to track -->
+    <metric>count turtles with [color = red]</metric>
+    <metric>count turtles with [color = green]</metric>
+    <metric>count turtles with [color = white]</metric>
+    <metric>count turtles with [color = yellow]</metric>
+    
+    <!-- Parameter Sets -->
+    <enumeratedValueSet variable="network-parameter">
+      <value value="6"/>
+      <value value="3"/>
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="social-conformity">
+      <value value="-0.35"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="social-blindness">
+      <value value="0.35"/>
+      <value value="0.40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="habit-threshold">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="cognitive-dissonance-threshold">
+      <value value="0.43"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>

@@ -1,0 +1,37 @@
+NetLogo_Console --headless ^
+  --model "C:\Users\zheng\Downloads\an-abm-of-historic-british-milk-consumption_v1.0.0\code\abm_milk_choice_upload.nlogo" ^
+  --setup-file "%USERPROFILE%\Documents\bspace-output\my_exp.xml" ^
+  --experiment "my_exp" ^  <!-- name of the experiment -->
+  --threads 2 ^  
+  --table "%USERPROFILE%\Documents\bspace-output\milk-choice-table.csv" ^ <!-- make sure to rename to avoid duplication-->
+  --spreadsheet "%USERPROFILE%\Documents\bspace-output\milk-choice-spreadsheet.csv" <!-- make sure to rename to avoid duplication-->
+
+
+Explanation of the Command:
+--model: Specifies the path to your NetLogo model (abm_milk_choice_upload.nlogo).
+--setup-file: Points to the XML file containing your experiment setup (my_exp.xml).
+--experiment: Specifies the name of the experiment within the XML file (my_exp).
+--threads 2: Specifies the number of threads for parallel execution. You can change this to 1 if you want the experiments to run one after another.
+--table and --spreadsheet: Specifies the paths where the table and spreadsheet output files will be saved.
+
+Location of the file stored: 
+"C:\Users\zheng\Documents\bspace-output\my_exp.xml"
+
+
+Let’s assume you have the following parameters with different values:
+
+network-parameter: 2 values (6, 3)
+memory-lifetime: 2 values (3, 1)
+social-conformity: 2 values (-0.35, 4)
+This gives you a total of:
+
+2×2×2=8
+ parameter combinations
+2×2×2=8 parameter combinations
+If you set repetitions="2", the total number of simulations would be:
+
+8×2=16
+
+ simulations
+8×2=16 simulations
+If you specify --threads 5, NetLogo will attempt to run 5 simulations simultaneously (but the total number of simulations is still 16, it just runs them in parallel).
