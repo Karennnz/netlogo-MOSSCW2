@@ -166,7 +166,7 @@ turtles-own [
 
   incum-history                     ;agent record of previous whole milk choices
   ;alt-history                       ;agent record of previous skimmed/semi-skimmed choices
-  oat-history
+   oat-history
   soy-history
   almond-history
 
@@ -187,7 +187,9 @@ turtles-own [
   value-health-deviation            ;the absolute difference between the held values of the agents, and the implied values by way of their choices
   value-env-deviation               ;the absolute difference between the held values of the agents, and the implied values by way of their choices
   cognitive-dissonance?             ;indicator for if agent is in a state of cognitive dissonance
-  disposition-probability-gradient] ;only for probabilty-based disposition approach - the gradient, k, of the logisitic function governing the probability that an agent will become disposed to consider its milk consumption choices
+  disposition-probability-gradient  ;only for probabilty-based disposition approach - the gradient, k, of the logisitic function governing the probability that an agent will become disposed to consider its milk consumption choices
+  campaign-intensity
+]
 
 ;Global variables to run the model
 globals [
@@ -197,18 +199,17 @@ globals [
   total-average-milk                ;
   min-unit                          ;the minimum allowable consumption of either milk choice, set at 1 pint (568ml)
   mean-incum                        ;main model output that measures the average whole milk consumption among agents
-  mean-alt                          ;main model output that measures the average skimmed/semi-skimmed milk consumption among agents
+  ;mean-alt                          ;main model output that measures the average skimmed/semi-skimmed milk consumption among agents
   mean-oat
   mean-soy
   mean-almond
+
   incum-total-try                   ;total instances of whole milk chosen by agents
   ;alt-total-try                     ;total instances of skimmed/semi-skimmed milk chosen by agents
   oat-total-try
   soy-total-try
   almond-total-try
   choice-total                      ;total choice made by agents
-
-
 
   ;variables governing the different health and environmental impacts associated with the milk choice
   sugar-list
@@ -231,29 +232,23 @@ globals [
   mean-health-impact   ;;added
   mean-env-impact
 
+  mean-plant-based ; Average of oat, soy, and almond consumption
+
 
   habit-on?                         ;habit function
   networks                          ;network function
   network-type                      ;type of network
   norms                             ;norms function
-  counter
-
-  price-incum       ; Price for whole milk
-  price-oat         ; Price for oat milk
-  price-soy         ; Price for soy milk
-  price-almond      ; Price for almond milk
-  demand-incum      ; Demand for whole milk (number of agents choosing whole milk)
-  demand-oat        ; Demand for oat milk
-  demand-soy        ; Demand for soy milk
-  demand-almond     ; Demand for almond milk
-  max-price         ; Maximum price agents are willing to pay
-  min-price         ; Minimum price for each milk type
-  price-weight      ;weighting the choice function for milks
-  price-elasticity]  ; Elasticity factor for price adjustments based on demand
-
-
-                          ;choice counter
-
+  counter                           ;choice counter
+  campaign-active?
+  target-milk
+  initial-target-consumption
+  campaign-start-tick
+  campaign-duration
+  co2-goal-reached?
+  health-tick-count
+  campaign-value  ;; added
+]
 
 ; netlogo extension used in the model
 extensions [
@@ -268,11 +263,12 @@ extensions [
 to setup
   clear-all
   set number-of-agents 1000
-  set mean-incum 100            ;initialise average liquid wholemilk consumption per person per week (ml)
+  ;set mean-incum 2654.81             ;initialise average liquid wholemilk consumption per person per week (ml)
+  set mean-incum 250           ;initialise average liquid wholemilk consumption per person per week (ml)
   ;set mean-alt 5.29                  ;initialise average skimmed (semi and full) consumption per person per week (ml)
-  set mean-oat 100
-  set mean-soy 100
-  set mean-almond 100
+  set mean-oat 200
+  set mean-soy 200
+  set mean-almond 200
   set habit-on? TRUE                 ;habit function
   set networks TRUE                  ;network function
   set network-type "watts-strogatz"  ;type of network
@@ -292,35 +288,18 @@ to setup
   set network-parameter round network-parameter
   if remainder network-parameter 2 != 0 [set network-parameter network-parameter + 1] ;constrain agent neighbours to an even number
   impact-metrics
+  set campaign-value 1  ;; initialize campaign-value
+  set campaign-active? false  ;; Initialize as a Boolean ;;added
   reset-ticks
-
-
- set price-incum initial-price-incum
- set price-oat initial-price-oat
- set price-soy initial-price-soy
- set price-almond initial-price-almond
-
- ; Set price bounds (for example, the price of any milk type can't go below 0.5 or above 3)
- set min-price 0.5
- set max-price 3.0
-
- ; Set price elasticity (higher means prices adjust more quickly to demand changes)
- set price-elasticity 0.1
-
- ;Set price weighting
- set price-weight 0.5
 end
 
 to setup-turtles
   foreach (list turtles) [[x] -> ask x [
 
   ;mean values as inputs to normal distribution to drawn values of milk charactersitics perceived by agents
-;  set incum-physical-mean 1
-;  set incum-health-mean 1
-;  set incum-env-mean 1
   set incum-physical-mean 1
-  set incum-health-mean incum-health-mean-initial
-  set incum-env-mean incum-env-mean-initial
+  set incum-health-mean 1
+  set incum-env-mean 1
   ;set alt-physical-mean 1             ;for this part of the model, in comparing the development of skimmed versus whole milk, the physcial characterisitics of the alternative (skimmed/semi-skimmed) were fixed at 1 to explore the range of possible values taken by health and environmental perception.
   ;set alt-health-mean alt-health-mean-initial
   ;set alt-env-mean alt-env-mean-initial
@@ -359,6 +338,47 @@ to setup-turtles
 
   set mem-ts (list)
 
+
+  ; this has been changed
+; Initialize perceived characteristics
+  let mmin 0.1
+
+  set pphincum random-normal incum-physical-mean 0.1
+  set pinincum random-normal incum-health-mean 0.1
+  set pexincum random-normal incum-env-mean 0.1
+
+  set pph_oat random-normal oat-physical-mean 0.1
+  set pin_oat random-normal oat-health-mean 0.1
+  set pex_oat random-normal oat-env-mean 0.1
+
+  set pph_soy random-normal soy-physical-mean 0.1
+  set pin_soy random-normal soy-health-mean 0.1
+  set pex_soy random-normal soy-env-mean 0.1
+
+  set pph_almond random-normal almond-physical-mean 0.1
+  set pin_almond random-normal almond-health-mean 0.1
+  set pex_almond random-normal almond-env-mean 0.1
+
+  ; Ensure values are above minimum threshold
+  while [pphincum <= mmin] [set pphincum random-normal incum-physical-mean 0.1]
+  while [pinincum <= mmin] [set pinincum random-normal incum-health-mean 0.1]
+  while [pexincum <= mmin] [set pexincum random-normal incum-env-mean 0.1]
+
+  while [pph_oat <= mmin] [set pph_oat random-normal oat-physical-mean 0.1]
+  while [pin_oat <= mmin] [set pin_oat random-normal oat-health-mean 0.1]
+  while [pex_oat <= mmin] [set pex_oat random-normal oat-env-mean 0.1]
+
+  while [pph_soy <= mmin] [set pph_soy random-normal soy-physical-mean 0.1]
+  while [pin_soy <= mmin] [set pin_soy random-normal soy-health-mean 0.1]
+  while [pex_soy <= mmin] [set pex_soy random-normal soy-env-mean 0.1]
+
+  while [pph_almond <= mmin] [set pph_almond random-normal almond-physical-mean 0.1]
+  while [pin_almond <= mmin] [set pin_almond random-normal almond-health-mean 0.1]
+  while [pex_almond <= mmin] [set pex_almond random-normal almond-env-mean 0.1]
+
+ ;this has been changed
+
+
   set last-choice color
   set food-choice color
   set disposition-piqued? FALSE
@@ -376,17 +396,23 @@ to setup-turtles
   set in-weight-raw random-float 1
   set ex-weight-raw random-float 1
 
-  ;initialise average liquid milk consumption per person per week (ml)
-  set incum-quantity 200
-;    
-;  set oat-quantity 200
-;  set soy-quantity 200
-;  set almond-quantity 200
-    
+;  ;initialise average liquid milk consumption per person per week (ml)
+;  set incum-quantity 2654.81
+;  ;set alt-quantity 5.29
+;  set mean-oat 3
+;  set mean-soy 2
+;  set mean-almond 1
+
+    ;initialise average liquid milk consumption per person per week (ml)
+  set incum-quantity 250
   ;set alt-quantity 5.29
-  set mean-oat 200
-  set mean-soy 200
-  set mean-almond 200
+  set oat-quantity 200
+  set soy-quantity 200
+  set almond-quantity 200
+
+;  set mean-oat 200
+;  set mean-soy 200
+;  set mean-almond 200
   ]]
 
   ask turtles [set color red]
@@ -492,7 +518,6 @@ to go
   memory-fill
   memory-delete
   disposition-function
-;  disposition-function-probability
   cognitive-function
   social-influence
   habit-activation
@@ -507,82 +532,32 @@ to go
 
   choice-evaluation
   prior-milk-amount
-  update-mean-alt
 
-  ;if ticks >= 32 [profiler:stop]
+  start-campaign1
+ manage-campaign
+
+;  campaign-submodel1     ; Add the campaign-submodel here
+;  track-and-adjust-campaign
+;
+;  ;if ticks >= 32 [profiler:stop]
+;;  if campaign-active? [
+;;    campaign-submodel
+;;    track-and-adjust-campaign
+;;  ]
+  ;end-campaign
   tick
 end
 
-to update-mean-alt
-  ; Calculate the mean of alternative milk types (oat, soy, and almond)
-  set mean-alt ((mean-oat + mean-soy + mean-almond) / 3)
+to manage-campaign
+  campaign-submodel
+  track-and-adjust-campaign
+  if not campaign-active? [end-campaign]
 end
-
-;New submodel for pricing
-to update-prices
- ; Calculate demand as the total number of agents choosing each milk type
- set demand-incum count turtles with [color = red]
- set demand-oat count turtles with [color = green]
- set demand-soy count turtles with [color = yellow]
- set demand-almond count turtles with [color = white]
-
- ; Calculate the price based on demand and market competition (elasticity)
- ; Example: price increases if demand is high, decreases if demand is low
- ; (This is a simple model, you can expand it based on your own assumptions)
-
- ; Dairy price adjustment
- set price-incum price-incum + (price-elasticity * (demand-incum - (number-of-agents / 4)))  ; Adjust based on demand
- set price-incum min list max list price-incum min-price max-price ; Ensure price stays within bounds
-
- ; Oat price adjustment
- set price-oat price-oat + (price-elasticity * (demand-oat - (number-of-agents / 4)))
- set price-oat min list max list price-oat min-price max-price ; Ensure price stays within bounds
-
- ; Soy price adjustment
- set price-soy price-soy + (price-elasticity * (demand-soy - (number-of-agents / 4)))
- set price-soy min list max list price-soy min-price max-price ; Ensure price stays within bounds
-
- ; Almond price adjustment
- set price-almond price-almond + (price-elasticity * (demand-almond - (number-of-agents / 4)))
- set price-almond min list max list price-almond min-price max-price ; Ensure price stays within bounds
-end
-
 
 to vary-info
   ;this function varies the information on milk characteristics perceived by agents
   ask turtles [
     if random-float 1 >= social-blindness and random-float 1 > 0.1 and ticks > 1 [
-
-
-      ;if alt-quantity = 0 [
-       ; ifelse (incum-health-mean / alt-health-mean) > 1000000
-        ;  [set alt-health-mean (alt-health-mean + (alt-health-mean * 0.05))] ;increases alt-health-mean by 5%
-         ; [set alt-health-mean (alt-health-mean - (alt-health-mean * 0.05))] ;decreases alt-health-mean by 5%
-
-        ;ifelse (incum-env-mean / alt-env-mean) > 1000000
-         ; [set alt-env-mean (alt-env-mean + (alt-env-mean * 0.05))] ;increases alt-env-mean by 5%
-          ;[set alt-env-mean (alt-env-mean - (alt-env-mean * 0.05))]] ;decreases alt-env-mean by 5%
-
-      ;if incum-quantity = 0 [
-       ; ifelse (incum-health-mean / alt-health-mean) > 0
-        ;  [set alt-health-mean (alt-health-mean + (alt-health-mean * 0.05))] ;increases alt-health-mean by 5%
-         ; [set alt-health-mean (alt-health-mean - (alt-health-mean * 0.05))] ;decreases alt-health-mean by 5%
-
-        ;ifelse (incum-env-mean / alt-env-mean) > 0
-         ; [set alt-env-mean (alt-env-mean + (alt-env-mean * 0.05))] ;increases alt-env-mean by 5%
-          ;[set alt-env-mean (alt-env-mean - (alt-env-mean * 0.05))] ;decreases alt-env-mean by 5%
-
-     ; if incum-quantity != 0 and alt-quantity != 0 [
-      ;  ifelse (incum-health-mean / alt-health-mean) > ((incum-quantity * item 0 choice-health-sums) / (alt-quantity * item 1 choice-health-sums))
-       ;   [set alt-health-mean (alt-health-mean + (alt-health-mean * 0.05))] ;increases alt-health-mean by 5%
-        ;  [set alt-health-mean (alt-health-mean - (alt-health-mean * 0.05))] ;decreases alt-health-mean by 5%
-
-        ;ifelse (incum-env-mean / alt-env-mean) > ((incum-quantity * item 0 choice-env-sums) / (alt-quantity * item 1 choice-env-sums))
-         ; [set alt-env-mean (alt-env-mean + (alt-env-mean * 0.05))] ;increases alt-env-mean by 5%
-          ;[set alt-env-mean (alt-env-mean - (alt-env-mean * 0.05))] ;decreases alt-env-mean by 5%
-
-
-      ; Oat varied quantities
 
       if oat-quantity = 0 [
         ifelse (incum-health-mean / oat-health-mean) > 1000000
@@ -683,10 +658,6 @@ to vary-info
       set pinincum random-normal incum-health-mean 0.1
       set pexincum random-normal incum-env-mean 0.1
 
-      ;set pphalt random-normal alt-physical-mean 0.1
-      ;set pinalt random-normal alt-health-mean 0.1
-      ;set pexalt random-normal alt-env-mean 0.1
-
       set pph_oat random-normal oat-physical-mean 0.1
       set pin_oat random-normal oat-health-mean 0.1
       set pex_oat random-normal oat-env-mean 0.1
@@ -702,14 +673,6 @@ to vary-info
       while [pphincum <= mmin] [set pphincum random-normal incum-physical-mean 0.1]
       while [pinincum <= mmin] [set pinincum random-normal incum-health-mean 0.1]
       while [pexincum <= mmin] [set pexincum random-normal incum-env-mean 0.1]
-
-      ;while [pphalt <= mmin] [set pphalt random-normal alt-physical-mean 0.1]
-      ;while [pinalt <= mmin] [set pinalt random-normal alt-health-mean 0.1]
-      ;while [pexalt <= mmin] [set pexalt random-normal alt-env-mean 0.1]
-
-;      while [pphoat <= mmin] [set pphoat random-normal alt-physical-mean 0.1]
-;      while [pinoat <= mmin] [set pinoat random-normal alt-health-mean 0.1]
-;      while [pexoat <= mmin] [set pexoat random-normal alt-env-mean 0.1]
       while [pph_oat <= mmin] [set pph_oat random-normal oat-physical-mean 0.1]
       while [pin_oat <= mmin] [set pin_oat random-normal oat-health-mean 0.1]
       while [pex_oat <= mmin] [set pex_oat random-normal oat-env-mean 0.1]
@@ -782,6 +745,7 @@ to memory-delete
   ]
 end
 
+
 to disposition-function
   ask turtles [
     ; Calculate the proportion of neighbors consuming different milk types
@@ -793,102 +757,22 @@ to disposition-function
       ; Compare with the agent's threshold
       ifelse disposition >= disposition-threshold [
         set disposition-piqued? TRUE
-      ] 
+      ]
       [
         set disposition-piqued? FALSE
       ]
     ]
+    ;agents can also become disposed to consider alternatives given a state of cognitive dissonance
+    if cognitive-dissonance? = TRUE [
+    if choice-function-deviation = min(list choice-function-deviation value-health-deviation value-env-deviation)
+      [set disposition-piqued? TRUE]]
+
+    ;a small random of agents become spontaneously disposed
+    if (disposition-piqued? = FALSE) and (random-float 1 >= .97) [set disposition-piqued? TRUE]
+
+
   ]
 end
-;to disposition-function
-;  ;this function calculates and manages the process of agent disposition in the threshold-based model variant
-;  ask turtles [
-;    ifelse (count link-neighbors with [color != red]) = 0
-;      [set disposition 0]
-;      [ifelse (count link-neighbors with [color != green]) = 0
-;        [set disposition 0]
-;        [set disposition ((count link-neighbors with [color != red]) / (count link-neighbors with [color = red]))]]
-;    ifelse disposition >= disposition-threshold
-;      [set disposition-piqued? TRUE]
-;      [set disposition-piqued? FALSE]
-;
-;    ;agents can also become disposed to consider alternatives given a state of cognitive dissonance
-;    if cognitive-dissonance? = TRUE [
-;    if choice-function-deviation = min(list choice-function-deviation value-health-deviation value-env-deviation)
-;      [set disposition-piqued? TRUE]]
-;
-;    ;a small random of agents become spontaneously disposed
-;    if (disposition-piqued? = FALSE) and (random-float 1 >= .97) [set disposition-piqued? TRUE]
-;  ]
-;end
-
-;to disposition-function-probability
-;  ;this function calculates and manages the process of agent disposition in the probability-based model variant
-;  ask turtles [
-;    set f-red count link-neighbors with [color = red]
-;    set f-green count link-neighbors with [color = green]
-;    set f-all count link-neighbors
-;    set h-max (2 * (-(1 / 2) * log (1 / 2) 2))
-;
-;    ifelse ((count link-neighbors with [color != red]) = 0) or ((count link-neighbors with [color != green]) = 0)
-;      [set h-entropy 0]
-;      [set h-entropy ((-(f-red / f-all) * log (f-red / f-all) 2) + (-(f-green / f-all) * log (f-green / f-all) 2))]
-;
-;    set prob-disposition (1 / (1 + exp(- (disposition-probability-gradient) * ((h-entropy / h-max) - 0.5))))
-;
-;    ifelse random-float 1 <= prob-disposition
-;      [set disposition-piqued? TRUE]
-;      [set disposition-piqued? FALSE]
-;
-;    ;agents can also become disposed to consider alternatives given a state of cognitive dissonance
-;    if cognitive-dissonance? = TRUE [
-;    if choice-function-deviation = min(list choice-function-deviation value-health-deviation value-env-deviation)
-;      [set disposition-piqued? TRUE]]
-;  ]
-;end
-
-;to disposition-function-probability
-;  ; This function calculates and manages the process of agent disposition in the probability-based model variant
-;  ask turtles [
-;    ; Count neighbors of each type
-;    set f-red count link-neighbors with [color = red]         ; dairy
-;    set f-green count link-neighbors with [color = green]     ; oat
-;    set f-yellow count link-neighbors with [color = yellow]   ; soy
-;    set f-white count link-neighbors with [color = white]     ; almond
-;    set f-all count link-neighbors                            ; total number of neighbors
-;
-;    ; Maximum entropy for four options
-;    set h-max 2
-;
-;    ; Check if any of the choices has zero neighbors, if so, set entropy to 0
-;    ifelse ((count link-neighbors with [color != red]) = 0) or
-;            ((count link-neighbors with [color != green]) = 0) or
-;            ((count link-neighbors with [color != yellow]) = 0) or
-;            ((count link-neighbors with [color != white]) = 0)
-;      [set h-entropy 0]
-;      [
-;        ; Calculate entropy with four categories
-;        set h-entropy (-(f-red / f-all) * log (f-red / f-all) 2
-;                      - (f-green / f-all) * log (f-green / f-all) 2
-;                      - (f-yellow / f-all) * log (f-yellow / f-all) 2
-;                      - (f-white / f-all) * log (f-white / f-all) 2)
-;      ]
-;
-;    ; Calculate probability of disposition using logistic function with normalized entropy
-;    set prob-disposition (1 / (1 + exp(- (disposition-probability-gradient) * ((h-entropy / h-max) - 0.5))))
-;
-;    ; Set disposition status based on probability
-;    ifelse random-float 1 <= prob-disposition
-;      [set disposition-piqued? TRUE]
-;      [set disposition-piqued? FALSE]
-;
-;    ; Additional disposition consideration for cognitive dissonance
-;    if cognitive-dissonance? = TRUE [
-;      if choice-function-deviation = min(list choice-function-deviation value-health-deviation value-env-deviation)
-;        [set disposition-piqued? TRUE]
-;    ]
-;  ]
-;end
 
 to disposition-function-probability
   ; This function calculates and manages the process of agent disposition in the probability-based model variant
@@ -919,7 +803,8 @@ to disposition-function-probability
                       -(ifelse-value (p-white = 0) [0] [p-white * log (p-white) 2]))
       ]
     ; Calculate probability of disposition using logistic function with normalized entropy
-    set prob-disposition (1 / (1 + exp(- (disposition-probability-gradient) * ((h-entropy / h-max) - 0.5))))
+    ;set prob-disposition (1 / (1 + exp(- (disposition-probability-gradient) * ((h-entropy / h-max) - 0.5))))
+    set prob-disposition (1 / (1 + exp(-0.5)))
     ; Set disposition status based on probability
     ifelse random-float 1 <= prob-disposition
       [set disposition-piqued? TRUE]
@@ -931,30 +816,6 @@ to disposition-function-probability
     ]
   ]
 end
-
-
-;to cognitive-function ;Probably change this
-;  ;this function generates an agent's base score of the cognitive perception of the milk characterisitcs based on information
-;  ;it is exposed to, and the weights they ascribe to each of these characteristics
-;  ask turtles [
-;    set mem-ph-incum-avg mean mem-incum-ph ;physical
-;    set mem-ph-alt-avg mean mem-alt-ph
-;    set mem-in-incum-avg mean mem-incum-in ;health
-;    set mem-in-alt-avg mean mem-alt-in
-;    set mem-ex-incum-avg mean mem-incum-ex ;environment
-;    set mem-ex-alt-avg mean mem-alt-ex
-;
-;
-;    set weights-raw (list ph-weight-raw in-weight-raw ex-weight-raw)
-;    set ph-weight ph-weight-raw / sum weights-raw
-;    set in-weight in-weight-raw / sum weights-raw
-;    set ex-weight ex-weight-raw / sum weights-raw
-;
-;
-;    set uf-incum (ph-weight * mem-ph-incum-avg + in-weight * mem-in-incum-avg + ex-weight * mem-ex-incum-avg)
-;    set uf-alt (ph-weight * mem-ph-alt-avg + in-weight * mem-in-alt-avg + ex-weight * mem-ex-alt-avg)
-;  ]
-;end
 
 
 to cognitive-function
@@ -971,6 +832,7 @@ to cognitive-function
     set mem-in-oat-avg mean mem-oat-in
     set mem-in-soy-avg mean mem-soy-in
     set mem-in-almond-avg mean mem-almond-in
+    ;set mem-in-almond-avg mean mem-in-almond-in
 
     set mem-ex-incum-avg mean mem-incum-ex
     set mem-ex-oat-avg mean mem-oat-ex
@@ -988,26 +850,17 @@ to cognitive-function
     set uf-oat (ph-weight * mem-ph-oat-avg + in-weight * mem-in-oat-avg + ex-weight * mem-ex-oat-avg)
     set uf-soy (ph-weight * mem-ph-soy-avg + in-weight * mem-in-soy-avg + ex-weight * mem-ex-soy-avg)
     set uf-almond (ph-weight * mem-ph-almond-avg + in-weight * mem-in-almond-avg + ex-weight * mem-ex-almond-avg)
+
+    ; Apply campaign boost if campaign is active
+    if campaign-active? [
+      ;print
+      print (word "Campaign is active and increasing utility for: " target-milk)
+      if target-milk = "oat" [set uf-oat uf-oat + campaign-intensity]
+      if target-milk = "soy" [set uf-soy uf-soy + campaign-intensity]
+      if target-milk = "almond" [set uf-almond uf-almond + campaign-intensity]
+    ]
   ]
 end
-
-
-;to social-influence
-;  ;this function represents peer influence, modelled by modifying an agent's cognitive milk choice function by the mean value among
-;  ;its neighbours with the effect size based on the social susceptibility parameter
-;  if networks = TRUE [
-;  ask turtles [
-;    if random-float 1 <= p-interact [
-;    ifelse count my-links >= 1
-;      [let ME self
-;      set new-uf-incum (([uf-incum] of ME) * (1 - social-susceptibility)) + ((sum [uf-incum] of link-neighbors) / (count my-links)) * (social-susceptibility)
-;      set new-uf-alt (([uf-alt] of ME) * (1 - social-susceptibility)) + ((sum [uf-alt] of link-neighbors) / (count my-links)) * (social-susceptibility)]
-;      [set new-uf-incum uf-incum
-;      set new-uf-alt uf-alt]
-;    set uf-incum new-uf-incum
-;    set uf-alt new-uf-alt]]
-;  ]
-;end
 
 to social-influence
   ;this function represents peer influence, modeled by modifying an agent's cognitive milk choice function by the mean value among
@@ -1072,22 +925,6 @@ to social-norms
   ]
 end
 
-;to habit-activation
-;  ;this function models whether an agent's choice is influenced by habit, and the size of this influence.
-;  ask turtles [
-;    let peak-habit 2
-;    if num-conseq-same-choice >= habit-threshold [set habit? TRUE]
-;    if habit-on? and habit? [set habit-function TRUE]
-;    if (habit-function = TRUE) and (food-choice = green)
-;      [set habit-factor-alt (peak-habit - exp (-0.042 * (num-conseq-same-choice - habit-threshold)))
-;      set habit-factor-incum 1]
-;    if (habit-function = TRUE) and (food-choice = red)
-;      [set habit-factor-incum (peak-habit - exp (-0.042 * (num-conseq-same-choice - habit-threshold)))
-;      set habit-factor-alt 1]
-;    if habit-function = FALSE [set habit-factor-incum 1 set habit-factor-alt 1]
-;  ]
-;end
-
 to habit-activation
   ;this function models whether an agent's choice is influenced by habit, and the size of this influence.
   ask turtles [
@@ -1133,130 +970,6 @@ to habit-activation
   ]
 end
 
-
-;to make-choice
-;  ;this function represents the main decision making function where the cognitive functions of milk choices, modifed by social effects and habit,
-;  ;are compared and milk consumption is assigned proportionately to the respective size of these scored functions.
-;  ask turtles [
-;    ifelse (disposition-piqued? = TRUE) [
-;      if ((uf-incum * habit-factor-incum) > (uf-alt * habit-factor-alt)) [set color red set food-choice red]
-;      if ((uf-alt * habit-factor-alt) > (uf-incum * habit-factor-incum)) [set color green set food-choice green]
-;      set choice-history choice-history + 1
-;      if food-choice = red [set incum-history incum-history + 1]
-;      if food-choice = green [set alt-history alt-history + 1]]
-;
-;      [set color color set food-choice last-choice
-;      set choice-history choice-history + 1
-;      if food-choice = red [set incum-history incum-history + 1]
-;      if food-choice = green [set alt-history alt-history + 1]]
-;
-;    set min-unit 568 ;ml of 1 British pint
-;
-;    if (disposition-piqued? = TRUE) and ((uf-incum * habit-factor-incum + uf-alt * habit-factor-alt) != 0) [
-;      set incum-quantity ((uf-incum * habit-factor-incum) / (uf-incum * habit-factor-incum + uf-alt * habit-factor-alt)) * total-average-milk
-;      set alt-quantity ((uf-alt * habit-factor-alt) / (uf-incum * habit-factor-incum + uf-alt * habit-factor-alt)) * total-average-milk
-;    if incum-quantity < min-unit [
-;      set alt-quantity alt-quantity + incum-quantity
-;      set incum-quantity 0]
-;    if alt-quantity < min-unit [
-;      set incum-quantity incum-quantity + alt-quantity
-;      set alt-quantity 0]]
-;
-;    ifelse (disposition-piqued? = FALSE) and ticks > 1[
-;      set incum-quantity prior-quantity-incum set alt-quantity prior-quantity-alt]
-;      [set incum-quantity incum-quantity set alt-quantity alt-quantity]
-; ]
-;end
-
-;to make-choice
-;  ; this function represents the main decision-making function where the cognitive functions of milk choices,
-;  ; modified by social effects and habit, are compared, and milk consumption is assigned proportionately to
-;  ; the respective size of these scored functions.
-;  ask turtles [
-;    ifelse (disposition-piqued? = TRUE) [
-;      ; Compare utilities modified by habit factors for each milk type
-;      ; maybe a probelm in the way how max list is used in netlogo
-;      ;let max-uf max list (uf-incum * habit-factor-incum uf-oat * habit-factor-oat) ; (uf-soy * habit-factor-soy) (uf-almond * habit-factor-almond))
-;      let max-uf max list (list (uf-incum * habit-factor-incum)
-;                                 (uf-oat * habit-factor-oat)
-;                                 (uf-soy * habit-factor-soy)
-;                                 (uf-almond * habit-factor-almond))
-;
-;      if max-uf = (uf-incum * habit-factor-incum) [set color red set food-choice red]
-;      if max-uf = (uf-oat * habit-factor-oat) [set color green set food-choice green]
-;      if max-uf = (uf-soy * habit-factor-soy) [set color yellow set food-choice yellow]
-;      if max-uf = (uf-almond * habit-factor-almond) [set color white set food-choice white]
-;
-;      set choice-history choice-history + 1
-;      if food-choice = red [set incum-history incum-history + 1]
-;      if food-choice = green [set oat-history oat-history + 1]
-;      if food-choice = yellow [set soy-history soy-history + 1]
-;      if food-choice = white [set almond-history almond-history + 1]
-;    ]
-;    [ ; Default choice if disposition is not piqued
-;      set color color
-;      set food-choice last-choice
-;      set choice-history choice-history + 1
-;      if food-choice = red [set incum-history incum-history + 1]
-;      if food-choice = green [set oat-history oat-history + 1]
-;      if food-choice = yellow [set soy-history soy-history + 1]
-;      if food-choice = white [set almond-history almond-history + 1]
-;    ]
-;
-;    set min-unit 568 ; ml of 1 British pint
-;
-;    ; Calculate quantities based on utility functions and habit factors for each type
-;    if (disposition-piqued? = TRUE) and ((uf-incum * habit-factor-incum + uf-oat * habit-factor-oat + uf-soy * habit-factor-soy + uf-almond * habit-factor-almond) != 0) [
-;      let total-uf (uf-incum * habit-factor-incum + uf-oat * habit-factor-oat + uf-soy * habit-factor-soy + uf-almond * habit-factor-almond)
-;
-;      set incum-quantity ((uf-incum * habit-factor-incum) / total-uf) * total-average-milk
-;      set oat-quantity ((uf-oat * habit-factor-oat) / total-uf) * total-average-milk
-;      set soy-quantity ((uf-soy * habit-factor-soy) / total-uf) * total-average-milk
-;      set almond-quantity ((uf-almond * habit-factor-almond) / total-uf) * total-average-milk
-;
-;      ; Ensure minimum quantity constraints
-;      if incum-quantity < min-unit [
-;        set oat-quantity oat-quantity + incum-quantity
-;        set incum-quantity 0
-;      ]
-;      if oat-quantity < min-unit [
-;        set soy-quantity soy-quantity + oat-quantity
-;        set oat-quantity 0
-;      ]
-;      if soy-quantity < min-unit [
-;        set almond-quantity almond-quantity + soy-quantity
-;        set soy-quantity 0
-;      ]
-;      if almond-quantity < min-unit [
-;        set incum-quantity incum-quantity + almond-quantity
-;        set almond-quantity 0
-;      ]
-;    ]
-;
-;    ifelse (disposition-piqued? = FALSE) and ticks > 1 [
-;      set incum-quantity prior-quantity-incum
-;      set oat-quantity prior-quantity-oat
-;      set soy-quantity prior-quantity-soy
-;      set almond-quantity prior-quantity-almond
-;    ] [
-;      set incum-quantity incum-quantity
-;      set oat-quantity oat-quantity
-;      set soy-quantity soy-quantity
-;      set almond-quantity almond-quantity
-;    ]
-;  ]
-;end
-
-; New proportional distribution approach
-to redistribute-quantities [overflow-amount]
-  let total-other-quantities (oat-quantity + soy-quantity + almond-quantity)
-  if total-other-quantities > 0 [
-    set oat-quantity oat-quantity + (overflow-amount * (oat-quantity / total-other-quantities))
-    set soy-quantity soy-quantity + (overflow-amount * (soy-quantity / total-other-quantities))
-    set almond-quantity almond-quantity + (overflow-amount * (almond-quantity / total-other-quantities))
-  ]
-end
-
 to make-choice
   ; this function represents the main decision-making function where the cognitive functions of milk choices,
   ; modified by social effects and habit, are compared, and milk consumption is assigned proportionately to
@@ -1275,6 +988,7 @@ to make-choice
 
       ; Final comparison between the two maximums from the pairs
       let max-uf max (list max-incum-oat max-soy-almond)
+
 
       ; Assign food choice and color based on the maximum utility found
       if max-uf = incum-utility [set color red set food-choice red]
@@ -1298,7 +1012,8 @@ to make-choice
       if food-choice = white [set almond-history almond-history + 1]
     ]
 
-    set min-unit 568.261 ; ml of 1 British pint
+    ;set min-unit 568 ; ml of 1 British pint
+    set min-unit 500 ; ml of 1 British pint
 
     ; Calculate quantities based on utility functions and habit factors for each type
     if (disposition-piqued? = TRUE) and ((uf-incum * habit-factor-incum + uf-oat * habit-factor-oat + uf-soy * habit-factor-soy + uf-almond * habit-factor-almond) != 0) [
@@ -1309,43 +1024,7 @@ to make-choice
       set soy-quantity ((uf-soy * habit-factor-soy) / total-uf) * total-average-milk
       set almond-quantity ((uf-almond * habit-factor-almond) / total-uf) * total-average-milk
 
-;      ; Ensure minimum quantity constraints
-;      if incum-quantity < min-unit [
-;        set oat-quantity oat-quantity + incum-quantity
-;        set incum-quantity 0
-;      ]
-;      if oat-quantity < min-unit [
-;        set soy-quantity soy-quantity + oat-quantity
-;        set oat-quantity 0
-;      ]
-;      if soy-quantity < min-unit [
-;        set almond-quantity almond-quantity + soy-quantity
-;        set soy-quantity 0
-;      ]
-;      if almond-quantity < min-unit [
-;        set incum-quantity incum-quantity + almond-quantity
-;        set almond-quantity 0
-;      ]
-        if incum-quantity < min-unit [
-        let overflow incum-quantity
-        set incum-quantity 0
-        redistribute-quantities overflow
-      ]
-      if oat-quantity < min-unit [
-        let overflow oat-quantity
-        set oat-quantity 0
-        redistribute-quantities overflow
-      ]
-      if soy-quantity < min-unit [
-        let overflow soy-quantity
-        set soy-quantity 0
-        redistribute-quantities overflow
-      ]
-      if almond-quantity < min-unit [
-        let overflow almond-quantity
-        set almond-quantity 0
-        redistribute-quantities overflow
-      ]
+
     ]
 
     ifelse (disposition-piqued? = FALSE) and ticks > 1 [
@@ -1362,13 +1041,6 @@ to make-choice
   ]
 end
 
-
-;to ever-tried
-;  ;this function tracks the total number of choices for each milk type
-;  set incum-total-try sum [incum-history] of turtles
-;  set alt-total-try sum [alt-history] of turtles
-;  set choice-total sum [choice-history] of turtles
-;end
 to ever-tried
   ;this function tracks the total number of choices for each milk type
   set incum-total-try sum [incum-history] of turtles
@@ -1378,33 +1050,17 @@ to ever-tried
   set choice-total sum [choice-history] of turtles
 end
 
-
-;to average-consumption
-;  ;this function tracks the mean consumption (ml/week) of each milk type across agents
-;  if ticks < 1 [set mean-incum 2654.81 set mean-alt 5.29]
-;  if ticks >= 1 [set mean-incum mean [incum-quantity] of turtles set mean-alt mean [alt-quantity] of turtles]
-;end
-;to average-consumption
-;  ;this function tracks the mean consumption (ml/week) of each milk type across agents
-;  if ticks < 1 [
+to average-consumption
+  if ticks < 1 [
 ;    set mean-incum 2654.81
 ;    set mean-oat 3
 ;    set mean-soy 2
 ;    set mean-almond 1
-;  ]
-;  if ticks >= 1 [
-;    set mean-incum mean [incum-quantity] of turtles
-;    set mean-oat mean [oat-quantity] of turtles
-;    set mean-soy mean [soy-quantity] of turtles
-;    set mean-almond mean [almond-quantity] of turtles
-;  ]
-;end
-to average-consumption
-  if ticks < 1 [
-    set mean-incum 100
-    set mean-oat 100
-    set mean-soy 100
-    set mean-almond 100
+    set mean-incum 250
+    set mean-oat 200
+    set mean-soy 200
+    set mean-almond 200
+    set mean-plant-based ((mean-oat + mean-soy + mean-almond) / 3)
     set mean-health-impact 0 ;;rep the avg health impact across all agents
     set mean-env-impact 0
   ]
@@ -1413,6 +1069,7 @@ to average-consumption
     set mean-oat mean [oat-quantity] of turtles
     set mean-soy mean [soy-quantity] of turtles
     set mean-almond mean [almond-quantity] of turtles
+    set mean-plant-based ((mean-oat + mean-soy + mean-almond) / 3)
     set mean-health-impact mean [health-imp] of turtles
     set mean-env-impact mean [env-imp] of turtles
   ]
@@ -1435,12 +1092,6 @@ to prior-choice
   ]
 end
 
-;to prior-milk-amount
-;  ;this function manages agent's prior and current milk choice quantities
-;  ask turtles [
-;    set prior-quantity-incum incum-quantity set prior-quantity-alt alt-quantity
-;  ]
-;end
 to prior-milk-amount
   ;this function manages agent's prior and current milk choice quantities
   ask turtles [
@@ -1452,110 +1103,39 @@ to prior-milk-amount
 end
 
 
-;to impact-metrics ; add
-;  ;this function contains data on health and environmental impact metrics. The first values in each list refer to whole milk, the latter refer to skimmed/semi-skimmed.
-;  ;Values are per litre. CO2 impact is British Isles (BI) specific and differentiated by whole or semi/skimmed. Land and water are not BI specific or differentiated.
-;  set sugar-list [49.39 50.62] ;grams
-;  set satfat-list [19.76 6.61] ;grams
-;  set protein-list [36.12 37.03] ;grams
-;  set co2-list [1.30 1.07] ;kgCO2e
-;  set land-list [9 9] ;m2
-;  set water-list [628 628] ;litres
-;  set sugar-realtive [0.98 1.00] ;
-;  set satfat-relative [1.00 0.33] ;
-;  set protein-relative [0.98 1.00] ;
-;  set co2-relative [1.00 0.82] ;
-;  set land-relative [1.00 1.00] ;
-;  set water-relative [1.00 1.00] ;
-;  set choice-health-sums [1.00 0.33] ;note the protein score is subtracted from the health sum as more protein per serving is deemed beneficial
-;  set choice-env-sums [3.00 2.82] ;
-;  set health-diff (max(choice-health-sums) - min(choice-health-sums))
-;  set env-diff (max(choice-env-sums) - min(choice-env-sums))
-;end
-
 to impact-metrics
- set sugar-list [13 5 1 0]  ; Dairy, Oat, Soy, Almond (grams of sugar per liter)
- set satfat-list [1.5 0 0.5 0]    ; Dairy, Oat, Soy, Almond (grams of saturated fat per liter)
- set protein-list [8 4 7 1] ; Dairy, Oat, Soy, Almond (grams of protein per liter)
+ ; Nutritional impact metrics (grams per liter)
+ set sugar-list [50.005 34 2 2.7]  ; Dairy, Oat, Soy, Almond (grams of sugar per liter)
+ set satfat-list [13.185 3 3 2]    ; Dairy, Oat, Soy, Almond (grams of saturated fat per liter)
+ set protein-list [36.575 11 33 9] ; Dairy, Oat, Soy, Almond (grams of protein per liter)
 
- ; Updated Environmental impact metrics (from real data)
- set co2-list [3.15 0.90 0.98 0.70] ; Dairy, Oat, Soy, Almond (kg CO₂e per liter)
- set land-list [8.95 0.76 0.66 0.49]       ; Dairy, Oat, Soy, Almond (m² per liter)
- set water-list [628.2 48.24 27.8 371.46]    ; Dairy, Oat, Soy, Almond (liters of water per liter)
+ ; Environmental impact metrics
+ set co2-list [1.185 2.5 1 0.7]     ; Dairy, Oat, Soy, Almond (kg CO₂e per liter)
+ set land-list [9 7.6 10.5 0.5]     ; Dairy, Oat, Soy, Almond (m² per liter)
+ set water-list [628 482 27 371]    ; Dairy, Oat, Soy, Almond (liters of water per liter)
 
  ; Relative values for choice scoring (normalized to dairy milk as baseline of 1.0)
  ; For each product, the relative value is its value divided by the value of dairy
- set sugar-realtive [1.0 0.38 0.08 0.0]            ; Oat, Soy, Almond relative to Dairy
- set satfat-relative [1.0 0.0 0.33 0.0]        ; Oat, Soy, Almond relative to Dairy
- set protein-relative [1.0 0.5 0.88 0.125]       ; Oat, Soy, Almond relative to Dairy
+ set sugar-realtive[1 0.68 0.04 0.05]   ; Oat, Soy, Almond relative to Dairy
+ set satfat-relative [1 0.228 0.228 0.151] ; Oat, Soy, Almond relative to Dairy
+ set protein-relative [1 0.301 0.902 0.246] ; Oat, Soy, Almond relative to Dairy
 
- ; Updated relative environmental impact metrics (normalized to dairy milk as baseline of 1.0)
- set co2-relative [1.0 0.29 0.31 0.22]           ; Oat, Soy, Almond relative to Dairy
- set land-relative [1.0 0.08 0.07 0.05]          ; Oat, Soy, Almond relative to Dairy
- set water-relative [1.0 0.08 0.04 0.59]         ; Oat, Soy, Almond relative to Dairy
+ set co2-relative [1 2.11 0.846 0.591]     ; Oat, Soy, Almond relative to Dairy
+ set land-relative [1 0.844 1.167 0.056]   ; Oat, Soy, Almond relative to Dairy
+ set water-relative [1 0.768 0.043 0.591]  ; Oat, Soy, Almond relative to Dairy
 
-set choice-health-sums [3.0 0.88 1.29 0.125]        ; Improved soy and almond health scores
+; set choice-health-sums [1 0.61  -0.63  -0.04];saturated fat
+; set choice-env-sums [3.00  2.781 0.690 1.238];sum of relative enveronmental factors
 
-set choice-env-sums [3.0 0.44 0.42 0.86]
+ set choice-health-sums [1.01 1 1 1];saturated fat
+ set choice-env-sums [1.01 1.4 1.8 1.2] ;sum of relative enveronmental factors
 
  ; Calculate health and environmental differences for decision-making
  set health-diff (max choice-health-sums - min choice-health-sums)
  set env-diff (max choice-env-sums - min choice-env-sums)
- end
-;to impact-metrics
-;  ; Nutritional impact metrics - dairy 0.1 higher than others
-;  set sugar-list [2.1 2.0 2.0 2.0]        ; Dairy slightly higher
-;  set satfat-list [2.1 2.0 2.0 2.0]       ; Dairy slightly higher
-;  set protein-list [2.1 2.0 2.0 2.0]      ; Dairy slightly higher
-;
-;  ; Environmental impact metrics - dairy 0.1 higher
-;  set co2-list [2.1 2.0 2.0 2.0]          ; Dairy slightly higher
-;  set land-list [2.1 2.0 2.0 2.0]         ; Dairy slightly higher
-;  set water-list [2.1 2.0 2.0 2.0]        ; Dairy slightly higher
-;
-;  ; Relative values (normalized to dairy = 1.0)
-;  set sugar-realtive [1 0.95 0.95 0.95]    ; Others relative to dairy
-;  set satfat-relative [1 0.95 0.95 0.95]   ; Others relative to dairy
-;  set protein-relative [1 0.95 0.95 0.95]  ; Others relative to dairy
-;
-;  ; Environmental relatives (normalized to dairy = 1.0)
-;  set co2-relative [1 0.95 0.95 0.95]      ; Others relative to dairy
-;  set land-relative [1 0.95 0.95 0.95]     ; Others relative to dairy
-;  set water-relative [1 0.95 0.95 0.95]    ; Others relative to dairy
-;
-;  ; Choice sums - dairy slightly higher
-;  set choice-health-sums [1.1 1.0 1.0 1.0]  ; Health scores
-;  set choice-env-sums [1.1 1.0 1.0 1.0]     ; Environmental scores
-;
-;  ; Calculate differences
-;  set health-diff (max choice-health-sums - min choice-health-sums)
-;  set env-diff (max choice-env-sums - min choice-env-sums)
-;end
+end
 
 
-;to impact-tracker
-;  ;this function tracks the overall size of the health and environmental impact based on the quantities of each type of milk consumed by agents.
-;  ask turtles [
-;    set sugar-imp ((incum-quantity * item 0 sugar-list) + (alt-quantity * item 1 sugar-list)) / 1000
-;    set satfat-imp ((incum-quantity * item 0 satfat-list) + (alt-quantity * item 1 satfat-list)) / 1000
-;    set protein-imp ((incum-quantity * item 0 protein-list) + (alt-quantity * item 1 protein-list)) / 1000
-;    set co2-imp ((incum-quantity * item 0 co2-list) + (alt-quantity * item 1 co2-list)) / 1000
-;    set land-imp ((incum-quantity * item 0 land-list) + (alt-quantity * item 1 land-list)) / 1000
-;    set water-imp ((incum-quantity * item 0 water-list) + (alt-quantity * item 1 water-list)) / 1000
-;  ]
-;end
-
-;to impact-tracker
-;  ;this function tracks the overall size of the health and environmental impact based on the quantities of each type of milk consumed by agents.
-;  ask turtles [
-;    set sugar-imp ((incum-quantity * item 0 sugar-list) + (oat-quantity * item 1 sugar-list) + (soy-quantity * item 2 sugar-list) + (almond-quantity * item 3 sugar-list)) / 1000
-;    set satfat-imp ((incum-quantity * item 0 satfat-list) + (oat-quantity * item 1 satfat-list) + (soy-quantity * item 2 satfat-list) + (almond-quantity * item 3 satfat-list)) / 1000
-;    set protein-imp ((incum-quantity * item 0 protein-list) + (oat-quantity * item 1 protein-list) + (soy-quantity * item 2 protein-list) + (almond-quantity * item 3 protein-list)) / 1000
-;    set co2-imp ((incum-quantity * item 0 co2-list) + (oat-quantity * item 1 co2-list) + (soy-quantity * item 2 co2-list) + (almond-quantity * item 3 co2-list)) / 1000
-;    set land-imp ((incum-quantity * item 0 land-list) + (oat-quantity * item 1 land-list) + (soy-quantity * item 2 land-list) + (almond-quantity * item 3 land-list)) / 1000
-;    set water-imp ((incum-quantity * item 0 water-list) + (oat-quantity * item 1 water-list) + (soy-quantity * item 2 water-list) + (almond-quantity * item 3 water-list)) / 1000
-;  ]
-;end
 to impact-tracker
   ask turtles [
     set sugar-imp ((incum-quantity * item 0 sugar-list) + (oat-quantity * item 1 sugar-list) + (soy-quantity * item 2 sugar-list) + (almond-quantity * item 3 sugar-list)) / 1000
@@ -1576,36 +1156,7 @@ to impact-tracker
   set mean-env-impact mean [env-imp] of turtles
 end
 
-;to choice-evaluation
-;  ;this function models the evaluation of an agent's choice against its human values, and determines if an agent will enter a state of cognitive dissonace.
-;  ask turtles [
-;    if random-float 1 >= social-blindness [
-;      let incumbent-choice-function (uf-incum * habit-factor-incum)
-;      let alterative-choice-function (uf-alt * habit-factor-alt)
-;      let weighted-average-health-impact (incum-quantity * item 0 choice-health-sums + alt-quantity * item 1 choice-health-sums) / total-average-milk
-;      let weighted-average-env-impact (incum-quantity * item 0 choice-env-sums + alt-quantity * item 1 choice-env-sums) / total-average-milk
-;
-;      set choice-value-health weighted-average-health-impact - min(choice-health-sums) * (1 / (health-diff))
-;      set choice-value-env weighted-average-env-impact - min(choice-env-sums) * (1 / (env-diff))
-;
-;      set value-health-deviation abs (choice-value-health - security-value)
-;      set value-env-deviation abs (choice-value-env - universalism-value)
-;
-;      ; choice-function-deviation calculates the size of the difference, in percentage terms, between the highest scored choice and he mean of the other scores.
-;      set choice-function-deviation (max( list incumbent-choice-function alterative-choice-function) - (sum (list incumbent-choice-function alterative-choice-function) - (max( list incumbent-choice-function alterative-choice-function))) / 2) / (max( list incumbent-choice-function alterative-choice-function))
-;      ifelse ((value-health-deviation >= cognitive-dissonance-threshold) and (value-health-deviation <= justification)) or ((value-env-deviation >= cognitive-dissonance-threshold) and (value-env-deviation <= justification))
-;        [set cognitive-dissonance? TRUE]
-;        [set cognitive-dissonance? FALSE]
-;
-;      if cognitive-dissonance? = TRUE [
-;        if (value-health-deviation = min(list choice-function-deviation value-health-deviation value-env-deviation)) and (count my-links >= 1)
-;          [let ME self
-;          set security-value (([security-value] of ME) * ( 1 - social-susceptibility )) + ((sum [security-value] of link-neighbors) / ( count my-links )) * (social-susceptibility)]
-;        if (value-env-deviation = min(list choice-function-deviation value-health-deviation value-env-deviation)) and (count my-links >= 1)
-;          [let ME self
-;          set universalism-value (([universalism-value] of ME) * ( 1 - social-susceptibility )) + ((sum [universalism-value] of link-neighbors) / ( count my-links )) * (social-susceptibility)]]]
-;  ]
-;end
+
 
 to choice-evaluation
   ; This function models the evaluation of an agent's choice against its human values, and determines if an agent will enter a state of cognitive dissonance.
@@ -1615,24 +1166,6 @@ to choice-evaluation
       let oat-choice-function (uf-oat * habit-factor-oat)
       let soy-choice-function (uf-soy * habit-factor-soy)
       let almond-choice-function (uf-almond * habit-factor-almond)
-
-      ; Calculate price impact for each milk type (lower price increases attractiveness)
-      let price-impact-incum (1 - (price-incum - min-price) * price-weight)
-      let price-impact-oat (1 - (price-oat - min-price) * price-weight)
-      let price-impact-soy (1 - (price-soy - min-price) * price-weight)
-      let price-impact-almond (1 - (price-almond - min-price) * price-weight)
-
-      ; Adjust the choice functions by their price impact
-      set incumbent-choice-function incumbent-choice-function * price-impact-incum
-      set oat-choice-function oat-choice-function * price-impact-oat
-      set soy-choice-function soy-choice-function * price-impact-soy
-      set almond-choice-function almond-choice-function * price-impact-almond
-
-      ; Print adjusted choice functions to debug
-      print (word "Adjusted Incumbent Choice Function: " incumbent-choice-function)
-      print (word "Adjusted Oat Choice Function: " oat-choice-function)
-
-
       ; Calculate weighted average impacts across all milk types
       let weighted-average-health-impact (
         (incum-quantity * item 0 choice-health-sums) +
@@ -1654,8 +1187,8 @@ to choice-evaluation
           (sum (list incumbent-choice-function oat-choice-function soy-choice-function almond-choice-function) - max-choice-function) / 3
         ) / max-choice-function
       ]
-      set choice-value-health weighted-average-health-impact - min(choice-health-sums) * (1 / health-diff)
-      set choice-value-env weighted-average-env-impact - min(choice-env-sums) * (1 / env-diff)
+      set choice-value-health (weighted-average-health-impact - min(choice-health-sums)) * (1 / health-diff)
+      set choice-value-env (weighted-average-env-impact - min(choice-env-sums)) * (1 / env-diff)
       set value-health-deviation abs (choice-value-health - security-value)
       set value-env-deviation abs (choice-value-env - universalism-value)
       ifelse ((value-health-deviation >= cognitive-dissonance-threshold) and (value-health-deviation <= justification)) or ((value-env-deviation >= cognitive-dissonance-threshold) and (value-env-deviation <= justification)) [
@@ -1678,6 +1211,203 @@ to choice-evaluation
 end
 
 
+;to start-campaign
+;  ;; Outer loop: Check conditions for starting a campaign
+;  if ticks >= 3 and not campaign-active? [
+;    ;; Inner loop: Iterate over campaign-value
+;    while [campaign-value > 0] [
+;      ;; Determine the least-consumed milk type
+;      let least-consumed min (list mean-oat mean-soy mean-almond)
+;      if least-consumed = mean-oat [set target-milk "oat"]
+;      if least-consumed = mean-soy [set target-milk "soy"]
+;      if least-consumed = mean-almond [set target-milk "almond"]
+;
+;      ;; Initialize campaign variables
+;      set initial-target-consumption least-consumed
+;      set campaign-start-tick ticks
+;      set campaign-duration 0
+;      set campaign-active? true
+;      set co2-goal-reached? false
+;      set health-tick-count 0
+;
+;      ;; Break out of the loop once a campaign is started
+;      print (word "Campaign started targeting: " target-milk)
+;      stop
+;    ]
+;  ]
+;end
+;
+;
+;to campaign-submodel
+;  if campaign-active? [
+;    set campaign-duration ticks - campaign-start-tick
+;
+;    if campaign-duration = 5 and (initial-target-consumption - mean [target-milk] of turtles) >= 0.1 [
+;      set co2-goal-reached? true
+;    ]
+;    if campaign-duration = 10 and (initial-target-consumption - mean [target-milk] of turtles) >= 0.2 [
+;      set co2-goal-reached? true
+;    ]
+;    if campaign-duration = 30 and (initial-target-consumption - mean [target-milk] of turtles) >= 0.35 [
+;      set co2-goal-reached? true
+;    ]
+;
+;    if mean-health-impact > 0.5 [
+;      set co2-goal-reached? true
+;    ]
+;  ]
+;end
+;
+;to track-and-adjust-campaign
+;  if campaign-active? [
+;    if campaign-duration = 8 or campaign-duration = 13 or campaign-duration = 33 [
+;      if not co2-goal-reached? or mean-health-impact < 0.5 or mean [target-milk] of turtles < initial-target-consumption [
+;        set campaign-intensity min (list (campaign-intensity + 0.1) 0.5)
+;      ]
+;    ]
+;
+;    if co2-goal-reached? or mean-health-impact > 0.5 [
+;      end-campaign
+;    ]
+;  ]
+;end
+to track-and-adjust-campaign
+  if campaign-active? [
+    if campaign-duration = 8 or campaign-duration = 13 or campaign-duration = 33 [
+      let current-consumption 0
+      if target-milk = "oat" [set current-consumption mean [oat-quantity] of turtles]
+      if target-milk = "soy" [set current-consumption mean [soy-quantity] of turtles]
+      if target-milk = "almond" [set current-consumption mean [almond-quantity] of turtles]
 
-;;plot of Health Impact Over Time are updated at every tick to observe trends in the health imapct
-;;same logic to environment tracker
+      if not co2-goal-reached? or mean-health-impact < 0.5 or current-consumption < initial-target-consumption [
+        set campaign-intensity min (list (campaign-intensity + 0.1) 0.5)
+      ]
+    ]
+
+    if co2-goal-reached? or mean-health-impact > 0.5 [
+      end-campaign
+    ]
+  ]
+end
+
+;
+;to end-campaign
+;  set campaign-active? false
+;  let final-consumption mean [target-milk] of turtles
+;  ; Log final consumption for analysis
+;end
+
+to campaign-submodel
+  if campaign-active? [
+    set campaign-duration ticks - campaign-start-tick
+    print (word "Campaign duration: " campaign-duration)
+    let current-consumption 0
+    if target-milk = "oat" [set current-consumption mean [oat-quantity] of turtles]
+    if target-milk = "soy" [set current-consumption mean [soy-quantity] of turtles]
+    if target-milk = "almond" [set current-consumption mean [almond-quantity] of turtles]
+
+    if campaign-duration = 5 and (initial-target-consumption - current-consumption) >= 0.1 [
+      set co2-goal-reached? true
+    ]
+    if campaign-duration = 10 and (initial-target-consumption - current-consumption) >= 0.2 [
+      set co2-goal-reached? true
+    ]
+    if campaign-duration = 30 and (initial-target-consumption - current-consumption) >= 0.35 [
+      set co2-goal-reached? true
+    ]
+
+    if mean-health-impact > 0.5 [
+      set co2-goal-reached? true
+    ]
+  ]
+end
+
+
+to start-campaign
+  if ticks >= 3 and not campaign-active? [
+    let least-consumed min (list mean-oat mean-soy mean-almond)
+    if least-consumed = mean-oat [set target-milk "oat"]
+    if least-consumed = mean-soy [set target-milk "soy"]
+    if least-consumed = mean-almond [set target-milk "almond"]
+
+    if target-milk = "oat" [set initial-target-consumption mean-oat]
+    if target-milk = "soy" [set initial-target-consumption mean-soy]
+    if target-milk = "almond" [set initial-target-consumption mean-almond]
+
+    set campaign-start-tick ticks
+    set campaign-duration 0
+    set campaign-active? true
+    set co2-goal-reached? false
+    set health-tick-count 0
+    print (word "Campaign started targeting: " target-milk)
+  ]
+end
+
+to end-campaign
+  set campaign-active? false
+  let final-consumption 0
+  if target-milk = "oat" [set final-consumption mean [oat-quantity] of turtles]
+  if target-milk = "soy" [set final-consumption mean [soy-quantity] of turtles]
+  if target-milk = "almond" [set final-consumption mean [almond-quantity] of turtles]
+  print (word "Final consumption of " target-milk ": " final-consumption)
+end
+
+
+
+to start-campaign1
+  if ticks >= 3 and not campaign-active? [
+    let least-consumed min (list mean-oat mean-soy mean-almond)
+    if least-consumed = mean-oat [set target-milk "oat"]
+    if least-consumed = mean-soy [set target-milk "soy"]
+    if least-consumed = mean-almond [set target-milk "almond"]
+
+    if target-milk = "oat" [set initial-target-consumption mean-oat]
+    if target-milk = "soy" [set initial-target-consumption mean-soy]
+    if target-milk = "almond" [set initial-target-consumption mean-almond]
+
+    set campaign-start-tick ticks
+    set campaign-duration 0
+    set campaign-active? true
+    print (word "Campaign started targeting: " target-milk)
+  ]
+end
+
+to campaign-submodel1
+  if campaign-active? [
+    set campaign-duration ticks - campaign-start-tick
+
+    let current-consumption 0
+    if target-milk = "oat" [set current-consumption mean [oat-quantity] of turtles]
+    if target-milk = "soy" [set current-consumption mean [soy-quantity] of turtles]
+    if target-milk = "almond" [set current-consumption mean [almond-quantity] of turtles]
+
+    ; Check campaign milestones and goals
+    if campaign-duration = 5 and (initial-target-consumption - current-consumption) >= 0.1 [
+      set co2-goal-reached? true
+    ]
+    if campaign-duration = 10 and (initial-target-consumption - current-consumption) >= 0.2 [
+      set co2-goal-reached? true
+    ]
+    if campaign-duration = 30 and (initial-target-consumption - current-consumption) >= 0.35 [
+      set co2-goal-reached? true
+    ]
+
+    ; Check health impact
+    if mean-health-impact > 0.5 [
+      set co2-goal-reached? true
+    ]
+
+    ; Print campaign status for monitoring
+    print (word "Campaign duration: " campaign-duration)
+    print (word "Current consumption of " target-milk ": " current-consumption)
+  ]
+end
+
+to target-milk
+    let current-consumption 0
+    if target-milk = "oat" [set current-consumption mean [oat-quantity] of turtles]
+    if target-milk = "soy" [set current-consumption mean [soy-quantity] of turtles]
+    if target-milk = "almond" [set current-consumption mean [almond-quantity] of turtles]
+end
+
+

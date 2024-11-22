@@ -783,44 +783,26 @@ to memory-delete
 end
 
 to disposition-function
+  ;this function calculates and manages the process of agent disposition in the threshold-based model variant
   ask turtles [
-    ; Calculate the proportion of neighbors consuming different milk types
-    let total-neighbors count link-neighbors
-    if total-neighbors > 0 [
-      let different-choice-neighbors count link-neighbors with [color != [color] of myself]
-      set disposition different-choice-neighbors / total-neighbors
+    ifelse (count link-neighbors with [color != red]) = 0
+      [set disposition 0]
+      [ifelse (count link-neighbors with [color != green]) = 0
+        [set disposition 0]
+        [set disposition ((count link-neighbors with [color != red]) / (count link-neighbors with [color = red]))]]
+    ifelse disposition >= disposition-threshold
+      [set disposition-piqued? TRUE]
+      [set disposition-piqued? FALSE]
 
-      ; Compare with the agent's threshold
-      ifelse disposition >= disposition-threshold [
-        set disposition-piqued? TRUE
-      ] 
-      [
-        set disposition-piqued? FALSE
-      ]
-    ]
+    ;agents can also become disposed to consider alternatives given a state of cognitive dissonance
+    if cognitive-dissonance? = TRUE [
+    if choice-function-deviation = min(list choice-function-deviation value-health-deviation value-env-deviation)
+      [set disposition-piqued? TRUE]]
+
+    ;a small random of agents become spontaneously disposed
+    if (disposition-piqued? = FALSE) and (random-float 1 >= .97) [set disposition-piqued? TRUE]
   ]
 end
-;to disposition-function
-;  ;this function calculates and manages the process of agent disposition in the threshold-based model variant
-;  ask turtles [
-;    ifelse (count link-neighbors with [color != red]) = 0
-;      [set disposition 0]
-;      [ifelse (count link-neighbors with [color != green]) = 0
-;        [set disposition 0]
-;        [set disposition ((count link-neighbors with [color != red]) / (count link-neighbors with [color = red]))]]
-;    ifelse disposition >= disposition-threshold
-;      [set disposition-piqued? TRUE]
-;      [set disposition-piqued? FALSE]
-;
-;    ;agents can also become disposed to consider alternatives given a state of cognitive dissonance
-;    if cognitive-dissonance? = TRUE [
-;    if choice-function-deviation = min(list choice-function-deviation value-health-deviation value-env-deviation)
-;      [set disposition-piqued? TRUE]]
-;
-;    ;a small random of agents become spontaneously disposed
-;    if (disposition-piqued? = FALSE) and (random-float 1 >= .97) [set disposition-piqued? TRUE]
-;  ]
-;end
 
 ;to disposition-function-probability
 ;  ;this function calculates and manages the process of agent disposition in the probability-based model variant
@@ -1298,7 +1280,7 @@ to make-choice
       if food-choice = white [set almond-history almond-history + 1]
     ]
 
-    set min-unit 568.261 ; ml of 1 British pint
+    set min-unit 500 ; ml of 1 British pint
 
     ; Calculate quantities based on utility functions and habit factors for each type
     if (disposition-piqued? = TRUE) and ((uf-incum * habit-factor-incum + uf-oat * habit-factor-oat + uf-soy * habit-factor-soy + uf-almond * habit-factor-almond) != 0) [
@@ -1473,64 +1455,91 @@ end
 ;  set env-diff (max(choice-env-sums) - min(choice-env-sums))
 ;end
 
-to impact-metrics
- set sugar-list [13 5 1 0]  ; Dairy, Oat, Soy, Almond (grams of sugar per liter)
- set satfat-list [1.5 0 0.5 0]    ; Dairy, Oat, Soy, Almond (grams of saturated fat per liter)
- set protein-list [8 4 7 1] ; Dairy, Oat, Soy, Almond (grams of protein per liter)
-
- ; Updated Environmental impact metrics (from real data)
- set co2-list [3.15 0.90 0.98 0.70] ; Dairy, Oat, Soy, Almond (kg CO₂e per liter)
- set land-list [8.95 0.76 0.66 0.49]       ; Dairy, Oat, Soy, Almond (m² per liter)
- set water-list [628.2 48.24 27.8 371.46]    ; Dairy, Oat, Soy, Almond (liters of water per liter)
-
- ; Relative values for choice scoring (normalized to dairy milk as baseline of 1.0)
- ; For each product, the relative value is its value divided by the value of dairy
- set sugar-realtive [1.0 0.38 0.08 0.0]            ; Oat, Soy, Almond relative to Dairy
- set satfat-relative [1.0 0.0 0.33 0.0]        ; Oat, Soy, Almond relative to Dairy
- set protein-relative [1.0 0.5 0.88 0.125]       ; Oat, Soy, Almond relative to Dairy
-
- ; Updated relative environmental impact metrics (normalized to dairy milk as baseline of 1.0)
- set co2-relative [1.0 0.29 0.31 0.22]           ; Oat, Soy, Almond relative to Dairy
- set land-relative [1.0 0.08 0.07 0.05]          ; Oat, Soy, Almond relative to Dairy
- set water-relative [1.0 0.08 0.04 0.59]         ; Oat, Soy, Almond relative to Dairy
-
-set choice-health-sums [3.0 0.88 1.29 0.125]        ; Improved soy and almond health scores
-
-set choice-env-sums [3.0 0.44 0.42 0.86]
-
- ; Calculate health and environmental differences for decision-making
- set health-diff (max choice-health-sums - min choice-health-sums)
- set env-diff (max choice-env-sums - min choice-env-sums)
- end
 ;to impact-metrics
-;  ; Nutritional impact metrics - dairy 0.1 higher than others
-;  set sugar-list [2.1 2.0 2.0 2.0]        ; Dairy slightly higher
-;  set satfat-list [2.1 2.0 2.0 2.0]       ; Dairy slightly higher
-;  set protein-list [2.1 2.0 2.0 2.0]      ; Dairy slightly higher
+; ; Nutritional impact metrics (grams per liter)
+;; set sugar-list [50.005 34 2 2.7]  ; Dairy, Oat, Soy, Almond (grams of sugar per liter)
+;; set satfat-list [13.185 3 3 2]    ; Dairy, Oat, Soy, Almond (grams of saturated fat per liter)
+;; set protein-list [36.575 11 33 9] ; Dairy, Oat, Soy, Almond (grams of protein per liter)
+;;
+;; ; Environmental impact metrics
+;; set co2-list [1.185 2.5 1 0.7]     ; Dairy, Oat, Soy, Almond (kg CO₂e per liter)
+;; set land-list [6 7.6 5.5 0.5]     ; Dairy, Oat, Soy, Almond (m² per liter)
+;; set water-list [39 482 27 371]    ; Dairy, Oat, Soy, Almond (liters of water per liter)
+;;
+;; ; Relative values for choice scoring (normalized to dairy milk as baseline of 1.0)
+;; ; For each product, the relative value is its value divided by the value of dairy
+;; set sugar-realtive[0.50 0.68 0.04 0.05]   ; Oat, Soy, Almond relative to Dairy
+;; set satfat-relative [0.50 0.228 0.228 0.151] ; Oat, Soy, Almond relative to Dairy
+;; set protein-relative [0.50 0.301 0.902 0.246] ; Oat, Soy, Almond relative to Dairy
+;;
+;; set co2-relative [0.5 0.11 0.846 0.591]     ; Oat, Soy, Almond relative to Dairy
+;; set land-relative [0.5 0.844 1.167 0.056]   ; Oat, Soy, Almond relative to Dairy
+;; set water-relative [0.6 0.768 0.043 0.591]  ; Oat, Soy, Almond relative to Dairy
+;;
+;; set choice-health-sums [0.65 0.61 0.61 0.61];saturated fat
+;; set choice-env-sums [1.50  1.781 1.690 1.238];sum of relative enveronmental factors
+;;
+;; ; Calculate health and environmental differences for decision-making
+;; set health-diff (max choice-health-sums - min choice-health-sums)
+;; set env-diff (max choice-env-sums - min choice-env-sums)
+;   set sugar-list [50.005 34 2 2.7]  ; Dairy, Oat, Soy, Almond (grams of sugar per liter)
+; set satfat-list [13.185 3 3 2]    ; Dairy, Oat, Soy, Almond (grams of saturated fat per liter)
+; set protein-list [36.575 11 33 9] ; Dairy, Oat, Soy, Almond (grams of protein per liter)
 ;
-;  ; Environmental impact metrics - dairy 0.1 higher
-;  set co2-list [2.1 2.0 2.0 2.0]          ; Dairy slightly higher
-;  set land-list [2.1 2.0 2.0 2.0]         ; Dairy slightly higher
-;  set water-list [2.1 2.0 2.0 2.0]        ; Dairy slightly higher
+; ; Updated Environmental impact metrics (from real data)
+; set co2-list [3.15 0.903126194 0.98 0.702077383] ; Dairy, Oat, Soy, Almond (kg CO₂e per liter)
+; set land-list [8.95 0.76 0.66 0.496359329]       ; Dairy, Oat, Soy, Almond (m² per liter)
+; set water-list [628.2 48.24 27.8 371.4593343]    ; Dairy, Oat, Soy, Almond (liters of water per liter)
 ;
-;  ; Relative values (normalized to dairy = 1.0)
-;  set sugar-realtive [1 0.95 0.95 0.95]    ; Others relative to dairy
-;  set satfat-relative [1 0.95 0.95 0.95]   ; Others relative to dairy
-;  set protein-relative [1 0.95 0.95 0.95]  ; Others relative to dairy
+; ; Relative values for choice scoring (normalized to dairy milk as baseline of 1.0)
+; ; For each product, the relative value is its value divided by the value of dairy
+; set sugar-realtive [1 0.68 0.04 0.05]            ; Oat, Soy, Almond relative to Dairy
+; set satfat-relative [1 0.228 0.228 0.151]        ; Oat, Soy, Almond relative to Dairy
+; set protein-relative [1 0.301 0.902 0.246]       ; Oat, Soy, Almond relative to Dairy
 ;
-;  ; Environmental relatives (normalized to dairy = 1.0)
-;  set co2-relative [1 0.95 0.95 0.95]      ; Others relative to dairy
-;  set land-relative [1 0.95 0.95 0.95]     ; Others relative to dairy
-;  set water-relative [1 0.95 0.95 0.95]    ; Others relative to dairy
+; ; Updated relative environmental impact metrics (normalized to dairy milk as baseline of 1.0)
+; set co2-relative [1 0.287 0.311 0.223]           ; Oat, Soy, Almond relative to Dairy
+; set land-relative [1 0.085 0.074 0.055]          ; Oat, Soy, Almond relative to Dairy
+; set water-relative [1 0.077 0.044 0.591]         ; Oat, Soy, Almond relative to Dairy
 ;
-;  ; Choice sums - dairy slightly higher
-;  set choice-health-sums [1.1 1.0 1.0 1.0]  ; Health scores
-;  set choice-env-sums [1.1 1.0 1.0 1.0]     ; Environmental scores
+;; set choice-health-sums [1 0.61 -0.63 -0.04]      ; saturated fat
+;; set choice-env-sums [3.00 0.449 0.429 0.869]     ; sum of relative environmental factors
+;set choice-health-sums [1 0.61 0.75 0.70]        ; Improved soy and almond health scores
+;set choice-env-sums [1.2 0.449 0.429 0.869]
 ;
-;  ; Calculate differences
-;  set health-diff (max choice-health-sums - min choice-health-sums)
-;  set env-diff (max choice-env-sums - min choice-env-sums)
-;end
+; ; Calculate health and environmental differences for decision-making
+; set health-diff (max choice-health-sums - min choice-health-sums)
+; set env-diff (max choice-env-sums - min choice-env-sums)
+; end
+to impact-metrics
+  ; Nutritional impact metrics - dairy 0.1 higher than others
+  set sugar-list [2.1 2.0 2.0 2.0]        ; Dairy slightly higher
+  set satfat-list [2.1 2.0 2.0 2.0]       ; Dairy slightly higher
+  set protein-list [2.1 2.0 2.0 2.0]      ; Dairy slightly higher
+
+  ; Environmental impact metrics - dairy 0.1 higher
+  set co2-list [2.1 2.0 2.0 2.0]          ; Dairy slightly higher
+  set land-list [2.1 2.0 2.0 2.0]         ; Dairy slightly higher
+  set water-list [2.1 2.0 2.0 2.0]        ; Dairy slightly higher
+
+  ; Relative values (normalized to dairy = 1.0)
+  set sugar-realtive [1 0.95 0.95 0.95]    ; Others relative to dairy
+  set satfat-relative [1 0.95 0.95 0.95]   ; Others relative to dairy
+  set protein-relative [1 0.95 0.95 0.95]  ; Others relative to dairy
+
+  ; Environmental relatives (normalized to dairy = 1.0)
+  set co2-relative [1 0.95 0.95 0.95]      ; Others relative to dairy
+  set land-relative [1 0.95 0.95 0.95]     ; Others relative to dairy
+  set water-relative [1 0.95 0.95 0.95]    ; Others relative to dairy
+
+  ; Choice sums - dairy slightly higher
+  set choice-health-sums [1.1 1.0 1.0 1.0]  ; Health scores
+  set choice-env-sums [1.1 1.0 1.0 1.0]     ; Environmental scores
+
+  ; Calculate differences
+  set health-diff (max choice-health-sums - min choice-health-sums)
+  set env-diff (max choice-env-sums - min choice-env-sums)
+end
 
 
 ;to impact-tracker
