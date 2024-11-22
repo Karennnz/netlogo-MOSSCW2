@@ -188,7 +188,7 @@ turtles-own [
   value-env-deviation               ;the absolute difference between the held values of the agents, and the implied values by way of their choices
   cognitive-dissonance?             ;indicator for if agent is in a state of cognitive dissonance
   disposition-probability-gradient  ;only for probabilty-based disposition approach - the gradient, k, of the logisitic function governing the probability that an agent will become disposed to consider its milk consumption choices
-  campaign-intensity
+  ;campaign-intensity
 ]
 
 ;Global variables to run the model
@@ -248,6 +248,22 @@ globals [
   co2-goal-reached?
   health-tick-count
   campaign-value  ;; added
+  campaign-intensity
+
+  total-milk       ; Variable to track the total milk
+  gradient         ; The gradient (rate of increase per tick)
+  initial
+  
+  almond-campaign?  ;; Switch for almond milk campaign
+  oat-campaign?     ;; Switch for oat milk campaign
+  soy-campaign?     ;; Switch for soy milk campaign
+  
+  ;initial-target-consumption ; Tracks the starting consumption of the targeted milk
+  ;campaign-intensity ; Intensity of the campaign
+ ; campaign-start-tick ; The tick when the campaign starts
+  ;calc-milk-quantities
+
+
 ]
 
 ; netlogo extension used in the model
@@ -290,8 +306,124 @@ to setup
   impact-metrics
   set campaign-value 1  ;; initialize campaign-value
   set campaign-active? false  ;; Initialize as a Boolean ;;added
+  
+  set almond-campaign? false  ;; Initialize almond campaign switch
+  set oat-campaign? false     ;; Initialize oat campaign switch
+  set soy-campaign? false 
+  
+  set total-milk (mean-incum + mean-oat + mean-soy + mean-almond) * number-of-agents
+  set initial (mean-incum + mean-oat + mean-soy + mean-almond) * number-of-agents
+  
+  ;Ensuring that the environmental and health factors do not start at zero but the actaul value
+  impact-metrics
+  set mean-env-impact ((mean-incum * item 0 co2-list) + (mean-oat * item 1 co2-list) + (mean-soy * item 2 co2-list) + (mean-almond * item 3 co2-list)) / (1000)  ;* total-average-milk
+  set mean-health-impact ((mean-incum * item 0 sugar-list) + (mean-oat * item 1 sugar-list) + (mean-soy * item 2 sugar-list) + (mean-almond * item 3 sugar-list)) / (1000)
+
+  
   reset-ticks
 end
+
+;to trigger-campaign
+;  ;; Only start checking for campaigns after tick 5
+;  if ticks > 5 [
+;    ;; Identify the least-consumed milk type
+;    let least-consumed min (list mean-oat mean-soy mean-almond)
+;    
+;    ;; Activate the respective campaign based on the least-consumed milk
+;    if least-consumed = mean-oat [
+;      set oat-campaign? true
+;      set soy-campaign? false
+;      set almond-campaign? false
+;      print "Oat milk campaign triggered!"
+;    ]
+;    if least-consumed = mean-soy [
+;      set soy-campaign? true
+;      set oat-campaign? false
+;      set almond-campaign? false
+;      print "Soy milk campaign triggered!"
+;    ]
+;    if least-consumed = mean-almond [
+;      set almond-campaign? true
+;      set oat-campaign? false
+;      set soy-campaign? false
+;      print "Almond milk campaign triggered!"
+;    ]
+;  ]
+;end
+
+to calc-milk-quantities
+  ;; Loop through all turtles to calculate the total milk quantity
+  ask turtles [
+    let total-for-this-turtle (incum-quantity + oat-quantity + soy-quantity + almond-quantity)
+    set total-milk total-milk + total-for-this-turtle
+  ]
+end
+
+
+to trigger-campaign
+  ;; Only start checking for campaigns after tick 5
+  if ticks > 5 [
+    ;; Identify the least-consumed milk type
+    let least-consumed min (list mean-oat mean-soy mean-almond)
+
+    ;; Activate the respective campaign based on the least-consumed milk
+    if least-consumed = mean-oat [
+      set oat-campaign? true
+      set soy-campaign? false
+      set almond-campaign? false
+      set initial-target-consumption mean-oat
+      print "Oat milk campaign triggered!"
+    ]
+    if least-consumed = mean-soy [
+      set soy-campaign? true
+      set oat-campaign? false
+      set almond-campaign? false
+      set initial-target-consumption mean-soy
+      print "Soy milk campaign triggered!"
+    ]
+    if least-consumed = mean-almond [
+      set almond-campaign? true
+      set oat-campaign? false
+      set soy-campaign? false
+      set initial-target-consumption mean-almond
+      print "Almond milk campaign triggered!"
+    ]
+
+    ;; Start campaign
+    set campaign-active? true
+    set campaign-start-tick ticks
+    set campaign-intensity 0.1
+  ]
+end
+
+to check-campaign-status
+  if campaign-active? [
+    ;; Calculate current consumption of the targeted milk
+    let current-consumption 0
+    if oat-campaign? [set current-consumption mean [oat-quantity] of turtles]
+    if soy-campaign? [set current-consumption mean [soy-quantity] of turtles]
+    if almond-campaign? [set current-consumption mean [almond-quantity] of turtles]
+
+    ;; Calculate the percentage increase
+    let percentage-increase ((current-consumption - initial-target-consumption) / initial-target-consumption) * 100
+
+    ;; Check if the increase exceeds the threshold
+    if percentage-increase >= 30 [  ;; Example: threshold is 30%
+      print (word "Campaign success! Target milk consumption increased by " percentage-increase "%.")
+      end-campaign
+    ]
+  ]
+end
+
+to end-campaign
+  ;; Reset campaign variables
+  set campaign-active? false
+  set oat-campaign? false
+  set soy-campaign? false
+  set almond-campaign? false
+  print "Campaign ended."
+end
+
 
 to setup-turtles
   foreach (list turtles) [[x] -> ask x [
@@ -431,7 +563,7 @@ to load-value-data
     [set value-data []
     ;set value-data (csv:from-file "/Users/matthewgibson/OneDrive - Imperial College London/PhD/netlogovaluedata.csv")
     set value-data (csv:from-file "C:/Users/zheng/Downloads/an-abm-of-historic-british-milk-consumption_v1.0.0/data/netlogovaluedata.csv")
-    user-message "File loading complete!"
+    ;user-message "File loading complete!"
     file-close]
     [user-message "Idiot. There is no netlogovaluedata.csv file in current directory dummy!"]
 end
@@ -510,7 +642,7 @@ end
 
 to go
   ;profiler:start
-  if ticks >= 32 [stop]
+  if ticks >= 45 [stop]
   if file-at-end? [stop]
   set norm-data (csv:from-row file-read-line ",")
   set total-average-milk item 5 norm-data
@@ -532,9 +664,12 @@ to go
 
   choice-evaluation
   prior-milk-amount
+  trigger-campaign
+  
+  calc-milk-quantities
 
-  start-campaign1
- manage-campaign
+;  start-campaign1
+ ; manage-campaign
 
 ;  campaign-submodel1     ; Add the campaign-submodel here
 ;  track-and-adjust-campaign
@@ -548,11 +683,11 @@ to go
   tick
 end
 
-to manage-campaign
-  campaign-submodel
-  track-and-adjust-campaign
-  if not campaign-active? [end-campaign]
-end
+;to manage-campaign
+;  ;campaign-submodel
+;  track-and-adjust-campaign
+;  if not campaign-active? [end-campaign]
+;end
 
 to vary-info
   ;this function varies the information on milk characteristics perceived by agents
@@ -852,13 +987,19 @@ to cognitive-function
     set uf-almond (ph-weight * mem-ph-almond-avg + in-weight * mem-in-almond-avg + ex-weight * mem-ex-almond-avg)
 
     ; Apply campaign boost if campaign is active
-    if campaign-active? [
-      ;print
-      print (word "Campaign is active and increasing utility for: " target-milk)
-      if target-milk = "oat" [set uf-oat uf-oat + campaign-intensity]
-      if target-milk = "soy" [set uf-soy uf-soy + campaign-intensity]
-      if target-milk = "almond" [set uf-almond uf-almond + campaign-intensity]
-    ]
+;    if campaign-active? [
+;      ;print
+;      print (word "Campaign is active and increasing utility for: " target-milk)
+;      if target-milk = "oat" [set uf-oat uf-oat + campaign-intensity]
+;      if target-milk = "soy" [set uf-soy uf-soy + campaign-intensity]
+;      if target-milk = "almond" [set uf-almond uf-almond + campaign-intensity]
+;    ]
+    
+    ; Apply boost if respective campaign switch is on
+    ;if almond-campaign? [set uf-almond uf-almond + 0.25]
+    if almond-campaign? [set uf-almond uf-almond * 1.25]
+    if oat-campaign? [set uf-oat uf-oat * 1.25]
+    if soy-campaign? [set uf-soy uf-soy * 1.25]
   ]
 end
 
@@ -969,18 +1110,20 @@ to habit-activation
     ]
   ]
 end
-
 to make-choice
   ; this function represents the main decision-making function where the cognitive functions of milk choices,
   ; modified by social effects and habit, are compared, and milk consumption is assigned proportionately to
   ; the respective size of these scored functions.
   ask turtles [
+   ; print (word "Turtle: " self " Disposition piqued? " disposition-piqued?)
     ifelse (disposition-piqued? = TRUE) [
       ; Calculate utilities modified by habit factors for each milk type
       let incum-utility (uf-incum * habit-factor-incum)
       let oat-utility (uf-oat * habit-factor-oat)
       let soy-utility (uf-soy * habit-factor-soy)
       let almond-utility (uf-almond * habit-factor-almond)
+
+      ;print (word "incum-utility: " incum-utility " oat-utility: " oat-utility " soy-utility: " soy-utility " almond-utility: " almond-utility)
 
       ; Compare the utilities in pairs
       let max-incum-oat max (list incum-utility oat-utility)
@@ -989,12 +1132,15 @@ to make-choice
       ; Final comparison between the two maximums from the pairs
       let max-uf max (list max-incum-oat max-soy-almond)
 
+      ;print (word "max-uf: " max-uf)
 
       ; Assign food choice and color based on the maximum utility found
-      if max-uf = incum-utility [set color red set food-choice red]
+      if max-uf = incum-utility [set color 55 set food-choice 55]
       if max-uf = oat-utility [set color green set food-choice green]
       if max-uf = soy-utility [set color yellow set food-choice yellow]
       if max-uf = almond-utility [set color white set food-choice white]
+
+      ;print (word "Food choice: " food-choice " Color: " color)
 
       set choice-history choice-history + 1
       if food-choice = red [set incum-history incum-history + 1]
@@ -1013,20 +1159,21 @@ to make-choice
     ]
 
     ;set min-unit 568 ; ml of 1 British pint
-    set min-unit 500 ; ml of 1 British pint
+    set min-unit 568 ; ml of 1 British pint
 
     ; Calculate quantities based on utility functions and habit factors for each type
     if (disposition-piqued? = TRUE) and ((uf-incum * habit-factor-incum + uf-oat * habit-factor-oat + uf-soy * habit-factor-soy + uf-almond * habit-factor-almond) != 0) [
       let total-uf (uf-incum * habit-factor-incum + uf-oat * habit-factor-oat + uf-soy * habit-factor-soy + uf-almond * habit-factor-almond)
+
+     ; print (word "total-uf: " total-uf)
 
       set incum-quantity ((uf-incum * habit-factor-incum) / total-uf) * total-average-milk
       set oat-quantity ((uf-oat * habit-factor-oat) / total-uf) * total-average-milk
       set soy-quantity ((uf-soy * habit-factor-soy) / total-uf) * total-average-milk
       set almond-quantity ((uf-almond * habit-factor-almond) / total-uf) * total-average-milk
 
-
+     ; print (word "incum-quantity: " incum-quantity " oat-quantity: " oat-quantity " soy-quantity: " soy-quantity " almond-quantity: " almond-quantity)
     ]
-
     ifelse (disposition-piqued? = FALSE) and ticks > 1 [
       set incum-quantity prior-quantity-incum
       set oat-quantity prior-quantity-oat
@@ -1040,6 +1187,73 @@ to make-choice
     ]
   ]
 end
+
+;to make-choice
+;  ; this function represents the main decision-making function where the cognitive functions of milk choices,
+;  ; modified by social effects and habit, are compared, and milk consumption is assigned proportionately to
+;  ; the respective size of these scored functions.
+;  ask turtles [
+;    ifelse (disposition-piqued? = TRUE) [
+;      ; Calculate utilities modified by habit factors for each milk type
+;      let incum-utility (uf-incum * habit-factor-incum)
+;      let oat-utility (uf-oat * habit-factor-oat)
+;      let soy-utility (uf-soy * habit-factor-soy)
+;      let almond-utility (uf-almond * habit-factor-almond)
+;
+;      ; Compare the utilities in pairs
+;      let max-incum-oat max (list incum-utility oat-utility)
+;      let max-soy-almond max (list soy-utility almond-utility)
+;
+;      ; Final comparison between the two maximums from the pairs
+;      let max-uf max (list max-incum-oat max-soy-almond)
+;
+;      ; Assign food choice and color based on the maximum utility found
+;      if max-uf = incum-utility [set color red set food-choice red]
+;      if max-uf = oat-utility [set color green set food-choice green]
+;      if max-uf = soy-utility [set color yellow set food-choice yellow]
+;      if max-uf = almond-utility [set color white set food-choice white]
+;
+;      set choice-history choice-history + 1
+;      if food-choice = red [set incum-history incum-history + 1]
+;      if food-choice = green [set oat-history oat-history + 1]
+;      if food-choice = yellow [set soy-history soy-history + 1]
+;      if food-choice = white [set almond-history almond-history + 1]
+;    ]
+;    [ ; Default choice if disposition is not piqued
+;      set color color
+;      set food-choice last-choice
+;      set choice-history choice-history + 1
+;      if food-choice = red [set incum-history incum-history + 1]
+;      if food-choice = green [set oat-history oat-history + 1]
+;      if food-choice = yellow [set soy-history soy-history + 1]
+;      if food-choice = white [set almond-history almond-history + 1]
+;    ]
+;
+;    ;set min-unit 568 ; ml of 1 British pint
+;    set min-unit 568 ; ml of 1 British pint
+;
+;    ; Calculate quantities based on utility functions and habit factors for each type
+;    if (disposition-piqued? = TRUE) and ((uf-incum * habit-factor-incum + uf-oat * habit-factor-oat + uf-soy * habit-factor-soy + uf-almond * habit-factor-almond) != 0) [
+;      let total-uf (uf-incum * habit-factor-incum + uf-oat * habit-factor-oat + uf-soy * habit-factor-soy + uf-almond * habit-factor-almond)
+;
+;      set incum-quantity ((uf-incum * habit-factor-incum) / total-uf) * total-average-milk
+;      set oat-quantity ((uf-oat * habit-factor-oat) / total-uf) * total-average-milk
+;      set soy-quantity ((uf-soy * habit-factor-soy) / total-uf) * total-average-milk
+;      set almond-quantity ((uf-almond * habit-factor-almond) / total-uf) * total-average-milk
+;    ]
+;    ifelse (disposition-piqued? = FALSE) and ticks > 1 [
+;      set incum-quantity prior-quantity-incum
+;      set oat-quantity prior-quantity-oat
+;      set soy-quantity prior-quantity-soy
+;      set almond-quantity prior-quantity-almond
+;    ] [
+;      set incum-quantity incum-quantity
+;      set oat-quantity oat-quantity
+;      set soy-quantity soy-quantity
+;      set almond-quantity almond-quantity
+;    ]
+;  ]
+;end
 
 to ever-tried
   ;this function tracks the total number of choices for each milk type
@@ -1120,7 +1334,8 @@ to impact-metrics
  set satfat-relative [1 0.228 0.228 0.151] ; Oat, Soy, Almond relative to Dairy
  set protein-relative [1 0.301 0.902 0.246] ; Oat, Soy, Almond relative to Dairy
 
- set co2-relative [1 2.11 0.846 0.591]     ; Oat, Soy, Almond relative to Dairy
+ ;set co2-relative [1 2.11 0.846 0.591]     ; Oat, Soy, Almond relative to Dairy
+ set co2-relative [1 0.911 0.846 0.591]     ; Oat, Soy, Almond relative to Dairy
  set land-relative [1 0.844 1.167 0.056]   ; Oat, Soy, Almond relative to Dairy
  set water-relative [1 0.768 0.043 0.591]  ; Oat, Soy, Almond relative to Dairy
 
@@ -1208,206 +1423,6 @@ to choice-evaluation
       ]
     ]
   ]
-end
-
-
-;to start-campaign
-;  ;; Outer loop: Check conditions for starting a campaign
-;  if ticks >= 3 and not campaign-active? [
-;    ;; Inner loop: Iterate over campaign-value
-;    while [campaign-value > 0] [
-;      ;; Determine the least-consumed milk type
-;      let least-consumed min (list mean-oat mean-soy mean-almond)
-;      if least-consumed = mean-oat [set target-milk "oat"]
-;      if least-consumed = mean-soy [set target-milk "soy"]
-;      if least-consumed = mean-almond [set target-milk "almond"]
-;
-;      ;; Initialize campaign variables
-;      set initial-target-consumption least-consumed
-;      set campaign-start-tick ticks
-;      set campaign-duration 0
-;      set campaign-active? true
-;      set co2-goal-reached? false
-;      set health-tick-count 0
-;
-;      ;; Break out of the loop once a campaign is started
-;      print (word "Campaign started targeting: " target-milk)
-;      stop
-;    ]
-;  ]
-;end
-;
-;
-;to campaign-submodel
-;  if campaign-active? [
-;    set campaign-duration ticks - campaign-start-tick
-;
-;    if campaign-duration = 5 and (initial-target-consumption - mean [target-milk] of turtles) >= 0.1 [
-;      set co2-goal-reached? true
-;    ]
-;    if campaign-duration = 10 and (initial-target-consumption - mean [target-milk] of turtles) >= 0.2 [
-;      set co2-goal-reached? true
-;    ]
-;    if campaign-duration = 30 and (initial-target-consumption - mean [target-milk] of turtles) >= 0.35 [
-;      set co2-goal-reached? true
-;    ]
-;
-;    if mean-health-impact > 0.5 [
-;      set co2-goal-reached? true
-;    ]
-;  ]
-;end
-;
-;to track-and-adjust-campaign
-;  if campaign-active? [
-;    if campaign-duration = 8 or campaign-duration = 13 or campaign-duration = 33 [
-;      if not co2-goal-reached? or mean-health-impact < 0.5 or mean [target-milk] of turtles < initial-target-consumption [
-;        set campaign-intensity min (list (campaign-intensity + 0.1) 0.5)
-;      ]
-;    ]
-;
-;    if co2-goal-reached? or mean-health-impact > 0.5 [
-;      end-campaign
-;    ]
-;  ]
-;end
-to track-and-adjust-campaign
-  if campaign-active? [
-    if campaign-duration = 8 or campaign-duration = 13 or campaign-duration = 33 [
-      let current-consumption 0
-      if target-milk = "oat" [set current-consumption mean [oat-quantity] of turtles]
-      if target-milk = "soy" [set current-consumption mean [soy-quantity] of turtles]
-      if target-milk = "almond" [set current-consumption mean [almond-quantity] of turtles]
-
-      if not co2-goal-reached? or mean-health-impact < 0.5 or current-consumption < initial-target-consumption [
-        set campaign-intensity min (list (campaign-intensity + 0.1) 0.5)
-      ]
-    ]
-
-    if co2-goal-reached? or mean-health-impact > 0.5 [
-      end-campaign
-    ]
-  ]
-end
-
-;
-;to end-campaign
-;  set campaign-active? false
-;  let final-consumption mean [target-milk] of turtles
-;  ; Log final consumption for analysis
-;end
-
-to campaign-submodel
-  if campaign-active? [
-    set campaign-duration ticks - campaign-start-tick
-    print (word "Campaign duration: " campaign-duration)
-    let current-consumption 0
-    if target-milk = "oat" [set current-consumption mean [oat-quantity] of turtles]
-    if target-milk = "soy" [set current-consumption mean [soy-quantity] of turtles]
-    if target-milk = "almond" [set current-consumption mean [almond-quantity] of turtles]
-
-    if campaign-duration = 5 and (initial-target-consumption - current-consumption) >= 0.1 [
-      set co2-goal-reached? true
-    ]
-    if campaign-duration = 10 and (initial-target-consumption - current-consumption) >= 0.2 [
-      set co2-goal-reached? true
-    ]
-    if campaign-duration = 30 and (initial-target-consumption - current-consumption) >= 0.35 [
-      set co2-goal-reached? true
-    ]
-
-    if mean-health-impact > 0.5 [
-      set co2-goal-reached? true
-    ]
-  ]
-end
-
-
-to start-campaign
-  if ticks >= 3 and not campaign-active? [
-    let least-consumed min (list mean-oat mean-soy mean-almond)
-    if least-consumed = mean-oat [set target-milk "oat"]
-    if least-consumed = mean-soy [set target-milk "soy"]
-    if least-consumed = mean-almond [set target-milk "almond"]
-
-    if target-milk = "oat" [set initial-target-consumption mean-oat]
-    if target-milk = "soy" [set initial-target-consumption mean-soy]
-    if target-milk = "almond" [set initial-target-consumption mean-almond]
-
-    set campaign-start-tick ticks
-    set campaign-duration 0
-    set campaign-active? true
-    set co2-goal-reached? false
-    set health-tick-count 0
-    print (word "Campaign started targeting: " target-milk)
-  ]
-end
-
-to end-campaign
-  set campaign-active? false
-  let final-consumption 0
-  if target-milk = "oat" [set final-consumption mean [oat-quantity] of turtles]
-  if target-milk = "soy" [set final-consumption mean [soy-quantity] of turtles]
-  if target-milk = "almond" [set final-consumption mean [almond-quantity] of turtles]
-  print (word "Final consumption of " target-milk ": " final-consumption)
-end
-
-
-
-to start-campaign1
-  if ticks >= 3 and not campaign-active? [
-    let least-consumed min (list mean-oat mean-soy mean-almond)
-    if least-consumed = mean-oat [set target-milk "oat"]
-    if least-consumed = mean-soy [set target-milk "soy"]
-    if least-consumed = mean-almond [set target-milk "almond"]
-
-    if target-milk = "oat" [set initial-target-consumption mean-oat]
-    if target-milk = "soy" [set initial-target-consumption mean-soy]
-    if target-milk = "almond" [set initial-target-consumption mean-almond]
-
-    set campaign-start-tick ticks
-    set campaign-duration 0
-    set campaign-active? true
-    print (word "Campaign started targeting: " target-milk)
-  ]
-end
-
-to campaign-submodel1
-  if campaign-active? [
-    set campaign-duration ticks - campaign-start-tick
-
-    let current-consumption 0
-    if target-milk = "oat" [set current-consumption mean [oat-quantity] of turtles]
-    if target-milk = "soy" [set current-consumption mean [soy-quantity] of turtles]
-    if target-milk = "almond" [set current-consumption mean [almond-quantity] of turtles]
-
-    ; Check campaign milestones and goals
-    if campaign-duration = 5 and (initial-target-consumption - current-consumption) >= 0.1 [
-      set co2-goal-reached? true
-    ]
-    if campaign-duration = 10 and (initial-target-consumption - current-consumption) >= 0.2 [
-      set co2-goal-reached? true
-    ]
-    if campaign-duration = 30 and (initial-target-consumption - current-consumption) >= 0.35 [
-      set co2-goal-reached? true
-    ]
-
-    ; Check health impact
-    if mean-health-impact > 0.5 [
-      set co2-goal-reached? true
-    ]
-
-    ; Print campaign status for monitoring
-    print (word "Campaign duration: " campaign-duration)
-    print (word "Current consumption of " target-milk ": " current-consumption)
-  ]
-end
-
-to target-milk
-    let current-consumption 0
-    if target-milk = "oat" [set current-consumption mean [oat-quantity] of turtles]
-    if target-milk = "soy" [set current-consumption mean [soy-quantity] of turtles]
-    if target-milk = "almond" [set current-consumption mean [almond-quantity] of turtles]
 end
 
 
