@@ -51,6 +51,8 @@ The goal is to analyse how individual agents (representing consumers) make choic
 ---
 
 ## File Descriptions
+- **`an-abm-of-historic-british-milk-consumption_v1.0.0Final.zip`**:
+  This is the full netlogo code with interfaces and relevant dataset used. 
 
 - **`Last_version.nlogo`**:
   The latest version with optimized features, including campaign dynamics.
